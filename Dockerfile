@@ -10,6 +10,10 @@ RUN npm run build
 
 # ---------- Backend build ----------
 FROM node:20-alpine AS backend-build
+# Prisma's engine binaries need libssl to detect the right build and to run
+# at all - without it, "prisma generate"/"migrate deploy" fail with a
+# non-JSON "Error loading shared library libssl..." error.
+RUN apk add --no-cache openssl
 WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm ci
@@ -18,7 +22,9 @@ RUN npm run build
 
 # ---------- Runtime ----------
 FROM node:20-alpine AS runtime
-RUN apk add --no-cache tini
+# openssl is required here too - "prisma migrate deploy" runs at container
+# start (see CMD below), not just at build time.
+RUN apk add --no-cache tini openssl
 WORKDIR /app
 ENV NODE_ENV=production
 
