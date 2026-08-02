@@ -84,19 +84,30 @@ instead of the default SQLite file - see the [Kodi wiki on MySQL](https://kodi.w
 if it isn't yet).
 
 1. Create a **read-only** MySQL user for this app (never give it write
-   access - it should never modify your Kodi library):
+   access - it should never modify your Kodi library). Grant it access to
+   every `MyVideosNNN` database with a single wildcarded GRANT, rather than
+   one exact name, since Kodi's schema-version suffix changes on upgrades:
    ```sql
    CREATE USER 'mywatchlist'@'%' IDENTIFIED BY 'choose-a-strong-password';
-   GRANT SELECT ON MyVideos121.* TO 'mywatchlist'@'%';
+   GRANT SELECT ON `MyVideos%`.* TO 'mywatchlist'@'%';
    FLUSH PRIVILEGES;
    ```
-   (Replace `MyVideos121` with your actual Kodi video DB name/version - check
-   Kodi's `advancedsettings.xml` under `<videodatabase><name>`.)
-2. Fill in `KODI_DB_HOST`, `KODI_DB_PORT`, `KODI_DB_USER`, `KODI_DB_PASSWORD`,
-   `KODI_DB_NAME` in `.env`.
+   (If your Kodi video database uses a different prefix - check
+   `advancedsettings.xml` under `<videodatabase><name>` - substitute it for
+   `MyVideos` both here and in `KODI_DB_NAME_PREFIX` below.)
+2. Fill in `KODI_DB_HOST`, `KODI_DB_PORT`, `KODI_DB_USER`, `KODI_DB_PASSWORD`
+   in `.env`. Leave `KODI_DB_NAME_PREFIX` at its default (`MyVideos`) unless
+   you use a custom prefix.
 3. Restart the container. Sync runs automatically on the `KODI_SYNC_CRON`
    schedule (default every 30 minutes) and can be triggered manually from
    **Settings → Kodi-Synchronisierung** (admin accounts only).
+
+**Which database it picks**: `KODI_DB_NAME_PREFIX` is a prefix, not the
+full database name. On every sync, the app lists all databases on the
+MySQL server matching `<prefix><number>` (e.g. `MyVideos116`, `MyVideos121`)
+and always uses whichever has the **highest number** - i.e. whatever Kodi's
+current schema version actually is, without needing to update `.env` after
+a Kodi upgrade creates a new database.
 
 **How matching works**: the sync matches Kodi's movies/episodes to your
 watchlist via Kodi's `uniqueid` table (which stores each item's TMDB ID, as

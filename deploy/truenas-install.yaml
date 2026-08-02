@@ -45,12 +45,15 @@ services:
       # Optional - https://thetvdb.com/dashboard/account/apikey
       TVDB_API_KEY: ""
 
-      # Optional - fill in to enable automatic Kodi watched-status sync
+      # Optional - fill in to enable automatic Kodi watched-status sync.
+      # KODI_DB_NAME_PREFIX is a prefix only (e.g. "MyVideos") - the app
+      # finds every "<prefix><number>" database on the server and always
+      # uses the one with the highest number, i.e. Kodi's current schema.
       KODI_DB_HOST: ""
       KODI_DB_PORT: "3306"
       KODI_DB_USER: ""
       KODI_DB_PASSWORD: ""
-      KODI_DB_NAME: "MyVideos121"
+      KODI_DB_NAME_PREFIX: "MyVideos"
       KODI_SYNC_CRON: "*/30 * * * *"
     volumes:
       - mywatchlist_data:/app/data

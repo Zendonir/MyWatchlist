@@ -4,9 +4,15 @@ import { env, kodiConfigured } from "../env";
 
 let pool: Pool | null = null;
 
+/**
+ * No fixed database is attached to this pool - Kodi's video DB name carries a
+ * schema version suffix that changes across Kodi upgrades (see
+ * resolveKodiDbName), so every query below qualifies its tables with the
+ * database name resolved at call time instead of relying on a pool default.
+ */
 function getPool(): Pool {
   if (!kodiConfigured) {
-    throw new Error("Kodi database is not configured (set KODI_DB_HOST/USER/PASSWORD/NAME)");
+    throw new Error("Kodi database is not configured (set KODI_DB_HOST/USER/PASSWORD)");
   }
   if (!pool) {
     pool = mysql.createPool({
@@ -14,13 +20,47 @@ function getPool(): Pool {
       port: env.KODI_DB_PORT,
       user: env.KODI_DB_USER,
       password: env.KODI_DB_PASSWORD,
-      database: env.KODI_DB_NAME,
       connectionLimit: 2,
       // The app only ever runs SELECTs against this database. Use a
-      // MySQL user with read-only GRANTs on the Kodi video DB - see README.
+      // MySQL user with read-only GRANTs on the Kodi video DB(s) - see README.
     });
   }
   return pool;
+}
+
+/**
+ * Kodi names its video library database "<prefix><schema version>" (e.g.
+ * MyVideos116, MyVideos121, ...) and bumps the number on schema upgrades,
+ * often leaving the previous database behind on the MySQL server. Rather
+ * than requiring an exact name, KODI_DB_NAME_PREFIX only supplies the
+ * prefix - we look at every database on the server matching "<prefix><N>"
+ * and use whichever has the highest N, i.e. whatever Kodi is actually using.
+ */
+async function resolveKodiDbName(): Promise<string> {
+  const prefix = env.KODI_DB_NAME_PREFIX;
+  const conn = await mysql.createConnection({
+    host: env.KODI_DB_HOST,
+    port: env.KODI_DB_PORT,
+    user: env.KODI_DB_USER,
+    password: env.KODI_DB_PASSWORD,
+  });
+  try {
+    const [rows] = await conn.query(
+      "SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA WHERE SCHEMA_NAME REGEXP ?",
+      [`^${prefix}[0-9]+$`]
+    );
+    const names = (rows as { name: string }[]).map((r) => r.name);
+    if (names.length === 0) {
+      throw new Error(
+        `No Kodi database found matching prefix "${prefix}" (expected something like "${prefix}121")`
+      );
+    }
+    // Names matched `^prefix[0-9]+$` above, so the suffix is a plain integer.
+    names.sort((a, b) => Number(b.slice(prefix.length)) - Number(a.slice(prefix.length)));
+    return names[0];
+  } finally {
+    await conn.end();
+  }
 }
 
 interface KodiMovieRow {
@@ -50,19 +90,23 @@ interface KodiEpisodeRow {
  * If your Kodi version uses a materially different schema, run
  * `SHOW COLUMNS FROM movie_view` / `episode_view` against your Kodi DB and
  * adjust the queries below accordingly.
+ *
+ * `dbName` comes from resolveKodiDbName(), which only ever returns strings
+ * matching /^[A-Za-z0-9_]+[0-9]+$/, so interpolating it as a quoted
+ * identifier below can't introduce injectable SQL.
  */
-async function fetchWatchedMovies(): Promise<KodiMovieRow[]> {
+async function fetchWatchedMovies(dbName: string): Promise<KodiMovieRow[]> {
   const [rows] = await getPool().query(
     `SELECT m.idMovie AS idMovie, f.playCount AS playCount, u.value AS tmdbId
-     FROM movie m
-     JOIN files f ON f.idFile = m.idFile
-     LEFT JOIN uniqueid u ON u.media_id = m.idMovie AND u.media_type = 'movie' AND u.type = 'tmdb'
+     FROM \`${dbName}\`.movie m
+     JOIN \`${dbName}\`.files f ON f.idFile = m.idFile
+     LEFT JOIN \`${dbName}\`.uniqueid u ON u.media_id = m.idMovie AND u.media_type = 'movie' AND u.type = 'tmdb'
      WHERE f.playCount > 0`
   );
   return rows as KodiMovieRow[];
 }
 
-async function fetchWatchedEpisodes(): Promise<KodiEpisodeRow[]> {
+async function fetchWatchedEpisodes(dbName: string): Promise<KodiEpisodeRow[]> {
   // Column names are validated against /^c[0-9]{1,2}$/ in env.ts, so this
   // interpolation cannot introduce injectable SQL.
   const seasonCol = env.KODI_EPISODE_SEASON_COLUMN;
@@ -70,31 +114,35 @@ async function fetchWatchedEpisodes(): Promise<KodiEpisodeRow[]> {
   const [rows] = await getPool().query(
     `SELECT e.idEpisode AS idEpisode, ev.${seasonCol} AS season, ev.${episodeCol} AS episode,
             f.playCount AS playCount, u.value AS showTmdbId
-     FROM episode e
-     JOIN episode_view ev ON ev.idEpisode = e.idEpisode
-     JOIN files f ON f.idFile = e.idFile
-     JOIN tvshow tv ON tv.idShow = e.idShow
-     LEFT JOIN uniqueid u ON u.media_id = tv.idShow AND u.media_type = 'tvshow' AND u.type = 'tmdb'
+     FROM \`${dbName}\`.episode e
+     JOIN \`${dbName}\`.episode_view ev ON ev.idEpisode = e.idEpisode
+     JOIN \`${dbName}\`.files f ON f.idFile = e.idFile
+     JOIN \`${dbName}\`.tvshow tv ON tv.idShow = e.idShow
+     LEFT JOIN \`${dbName}\`.uniqueid u ON u.media_id = tv.idShow AND u.media_type = 'tvshow' AND u.type = 'tmdb'
      WHERE f.playCount > 0`
   );
   return rows as KodiEpisodeRow[];
 }
 
-export async function testKodiConnection(): Promise<void> {
+export async function testKodiConnection(): Promise<{ dbName: string }> {
+  const dbName = await resolveKodiDbName();
   const conn = await getPool().getConnection();
   try {
-    await conn.query("SELECT 1");
+    await conn.query(`SELECT 1 FROM \`${dbName}\`.movie LIMIT 1`);
   } finally {
     conn.release();
   }
+  return { dbName };
 }
 
-export async function runKodiSync(): Promise<{ itemsUpdated: number }> {
+export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: string }> {
   const log = await prisma.syncLog.create({ data: { source: "kodi", status: "running" } });
   let itemsUpdated = 0;
 
   try {
-    const movieRows = await fetchWatchedMovies();
+    const dbName = await resolveKodiDbName();
+
+    const movieRows = await fetchWatchedMovies(dbName);
     for (const row of movieRows) {
       if (!row.tmdbId) continue;
       const tmdbId = Number(row.tmdbId);
@@ -107,7 +155,7 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number }> {
       itemsUpdated += result.count;
     }
 
-    const episodeRows = await fetchWatchedEpisodes();
+    const episodeRows = await fetchWatchedEpisodes(dbName);
     for (const row of episodeRows) {
       if (!row.showTmdbId) continue;
       const showTmdbId = Number(row.showTmdbId);
@@ -149,9 +197,9 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number }> {
 
     await prisma.syncLog.update({
       where: { id: log.id },
-      data: { finishedAt: new Date(), status: "success", itemsUpdated },
+      data: { finishedAt: new Date(), status: "success", itemsUpdated, message: `db=${dbName}` },
     });
-    return { itemsUpdated };
+    return { itemsUpdated, dbName };
   } catch (err: any) {
     await prisma.syncLog.update({
       where: { id: log.id },

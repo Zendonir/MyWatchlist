@@ -19,7 +19,15 @@ const schema = z.object({
   KODI_DB_PORT: z.coerce.number().default(3306),
   KODI_DB_USER: z.string().optional(),
   KODI_DB_PASSWORD: z.string().optional(),
-  KODI_DB_NAME: z.string().optional(),
+  // Kodi creates a new "<prefix><schema version>" database (e.g. MyVideos116,
+  // MyVideos121, ...) every time it bumps its video DB schema, and older ones
+  // are usually left behind on the MySQL server. Rather than pin an exact
+  // name, we only take the prefix and pick whichever matching database has
+  // the highest numeric suffix - i.e. whatever Kodi is actually using now.
+  KODI_DB_NAME_PREFIX: z
+    .string()
+    .regex(/^[A-Za-z0-9_]+$/, "must be alphanumeric/underscore only, e.g. MyVideos")
+    .default("MyVideos"),
   KODI_SYNC_CRON: z.string().default("*/30 * * * *"),
   // Column names for season/episode number in the `episode_view` view.
   // These are content columns (c12/c13) that are historically stable but can
@@ -45,9 +53,7 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-export const kodiConfigured = Boolean(
-  env.KODI_DB_HOST && env.KODI_DB_USER && env.KODI_DB_PASSWORD && env.KODI_DB_NAME
-);
+export const kodiConfigured = Boolean(env.KODI_DB_HOST && env.KODI_DB_USER && env.KODI_DB_PASSWORD);
 
 export const tmdbConfigured = Boolean(env.TMDB_API_KEY || env.TMDB_ACCESS_TOKEN);
 export const tvdbConfigured = Boolean(env.TVDB_API_KEY);

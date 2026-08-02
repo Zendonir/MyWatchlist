@@ -28,8 +28,8 @@ syncRouter.get("/kodi/test", requireAdmin, async (_req, res) => {
     return res.status(503).json({ error: "Kodi database is not configured" });
   }
   try {
-    await testKodiConnection();
-    res.json({ ok: true });
+    const result = await testKodiConnection();
+    res.json({ ok: true, ...result });
   } catch (err: any) {
     res.status(502).json({ error: "Connection failed", detail: String(err?.message ?? err) });
   }
