@@ -18,6 +18,30 @@ Installs as a home-screen app on iPhone (PWA).
 - Session-based auth (bcrypt-hashed passwords, HTTP-only cookies), rate
   limiting on login, and security headers via Helmet.
 
+## Installing a release via YAML (no local build)
+
+Every tagged release (`vX.Y.Z`) is built by GitHub Actions and published to
+GitHub Container Registry as `ghcr.io/zendonir/mywatchlist`. Use
+[`deploy/truenas-install.yaml`](deploy/truenas-install.yaml) to install it
+without cloning the repo or building anything locally:
+
+- **TrueNAS SCALE**: Apps → Discover Apps → **Custom App** → **Install via
+  YAML**, paste the contents of `deploy/truenas-install.yaml` (filled in
+  with your own `SESSION_SECRET`/`APP_PASSWORD`/`TMDB_API_KEY`).
+- **Any other Docker host**:
+  ```bash
+  curl -O https://raw.githubusercontent.com/Zendonir/MyWatchlist/main/deploy/truenas-install.yaml
+  # edit the placeholders, then:
+  docker compose -f truenas-install.yaml up -d
+  ```
+
+The first time you do this, make sure the `ghcr.io/zendonir/mywatchlist`
+package is set to **Public** visibility (GitHub profile → Packages →
+mywatchlist → Package settings), otherwise anonymous pulls are denied.
+
+To build the image yourself instead of using the published one, follow the
+"Quick start" section below with the repo's root `docker-compose.yml`.
+
 ## Quick start (TrueNAS / any Docker host)
 
 1. Clone this repo onto your TrueNAS box (or wherever `docker compose` runs).
