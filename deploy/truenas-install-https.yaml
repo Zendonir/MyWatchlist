@@ -1,0 +1,95 @@
+# MyWatchlist - single-file HTTPS install for TrueNAS SCALE ("Install via
+# YAML"). Runs the app plus a Caddy reverse proxy with a self-signed local
+# certificate, published on host port 3000 (so you open
+# https://<truenas-ip>:3000 - note the https://, not http://).
+#
+# Why HTTPS at all: modern browsers increasingly assume every site speaks
+# HTTPS and can misbehave (upgrading individual asset requests on their own)
+# against a plain-HTTP app. Caddy's "tls internal" gives the app a real,
+# though self-signed, certificate so that stops happening. Your browser
+# will warn once per device ("connection not private") - click through it
+# ("Advanced" -> "Proceed") and it won't ask again.
+#
+# Before pasting this in:
+#   1. Fill in SESSION_SECRET, APP_USERNAME, APP_PASSWORD and TMDB_API_KEY
+#      below (see the main README for where to get a TMDB key and how to
+#      generate SESSION_SECRET).
+#   2. Make sure the ghcr.io/zendonir/mywatchlist package is set to "Public"
+#      visibility on GitHub (Profile -> Packages), otherwise pulling the
+#      image anonymously will fail with "denied".
+#   3. Kodi/TVDB variables are optional - leave them empty to disable sync.
+#
+# After starting: open https://<truenas-ip>:3000
+
+services:
+  mywatchlist:
+    image: ghcr.io/zendonir/mywatchlist:latest
+    container_name: mywatchlist
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "file:/app/data/mywatchlist.db"
+      TRUST_PROXY: "1"
+
+      # Required - generate with: openssl rand -base64 48
+      SESSION_SECRET: "REPLACE_ME_RANDOM_STRING"
+
+      # Required - creates the first admin account on initial startup only
+      APP_USERNAME: "admin"
+      APP_PASSWORD: "REPLACE_ME_STRONG_PASSWORD"
+
+      # Required for search/metadata - https://www.themoviedb.org/settings/api
+      TMDB_API_KEY: "REPLACE_ME_TMDB_API_KEY"
+      TMDB_ACCESS_TOKEN: ""
+
+      # Optional - https://thetvdb.com/dashboard/account/apikey
+      TVDB_API_KEY: ""
+
+      # Optional - fill in to enable automatic Kodi watched-status sync.
+      # KODI_DB_NAME_PREFIX is a prefix only (e.g. "MyVideos") - the app
+      # finds every "<prefix><number>" database on the server and always
+      # uses the one with the highest number, i.e. Kodi's current schema.
+      KODI_DB_HOST: ""
+      KODI_DB_PORT: "3306"
+      KODI_DB_USER: ""
+      KODI_DB_PASSWORD: ""
+      KODI_DB_NAME_PREFIX: "MyVideos"
+      KODI_SYNC_CRON: "*/30 * * * *"
+    volumes:
+      - mywatchlist_data:/app/data
+    # No ports published here on purpose - only Caddy is exposed externally,
+    # the app is reached through it over the internal Docker network.
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mywatchlist-caddy
+    restart: unless-stopped
+    ports:
+      # host:container - change the "3000" on the left if you want a
+      # different external port; the app always speaks HTTPS on it.
+      - "3000:443"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat <<'EOF' > /etc/caddy/Caddyfile
+        :443 {
+          tls internal
+          encode gzip
+          header {
+            X-Content-Type-Options "nosniff"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            X-Frame-Options "DENY"
+          }
+          reverse_proxy mywatchlist:3000
+        }
+        EOF
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - mywatchlist
+
+volumes:
+  mywatchlist_data:
+  caddy_data:
+  caddy_config:
