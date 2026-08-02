@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, MediaItem, posterUrl } from "../api/client";
+import { api, MediaItem, Episode, posterUrl, stillUrl } from "../api/client";
 
 const STATUS_OPTIONS = [
   { key: "watchlist", label: "Vormerkliste" },
@@ -14,6 +14,7 @@ export default function MediaDetail() {
   const navigate = useNavigate();
   const [item, setItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [posterFailed, setPosterFailed] = useState(false);
 
   useEffect(() => {
     load();
@@ -39,6 +40,12 @@ export default function MediaDetail() {
     load();
   }
 
+  async function toggleSeason(seasonNumber: number, watched: boolean) {
+    if (!item) return;
+    await api.patch(`/media/${item.id}/seasons/${seasonNumber}`, { watched });
+    load();
+  }
+
   async function remove() {
     if (!item) return;
     if (!confirm(`"${item.title}" aus der Watchlist entfernen?`)) return;
@@ -49,13 +56,17 @@ export default function MediaDetail() {
   if (loading) return <div className="centered-message">Lädt…</div>;
   if (!item) return <div className="centered-message">Nicht gefunden</div>;
 
-  const poster = posterUrl(item.posterPath, "w500");
+  const poster = !posterFailed ? posterUrl(item.posterPath, "w500") : null;
   const bySeason = groupBySeason(item.episodes);
 
   return (
     <div className="page detail-page">
       <div className="detail-header">
-        {poster && <img className="detail-poster" src={poster} alt="" />}
+        {poster ? (
+          <img className="detail-poster" src={poster} alt="" onError={() => setPosterFailed(true)} />
+        ) : (
+          <div className="detail-poster detail-poster--placeholder">🎬</div>
+        )}
         <div>
           <h1 className="page__title">{item.title}</h1>
           <p className="detail-meta">{item.releaseDate?.slice(0, 4)}</p>
@@ -77,19 +88,28 @@ export default function MediaDetail() {
 
       {item.mediaType === "tv" && item.episodes.length > 0 && (
         <div className="episode-list">
-          {Object.entries(bySeason).map(([season, episodes]) => (
-            <div key={season}>
-              <h2 className="episode-list__season">Staffel {season}</h2>
-              {episodes.map((ep) => (
-                <label key={ep.id} className="episode-row">
-                  <input type="checkbox" checked={ep.watched} onChange={(e) => toggleEpisode(ep.id, e.target.checked)} />
-                  <span>
-                    {ep.episodeNumber}. {ep.title ?? "Folge " + ep.episodeNumber}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ))}
+          {Object.entries(bySeason).map(([season, episodes]) => {
+            const seasonNumber = Number(season);
+            const allWatched = episodes.every((e) => e.watched);
+            return (
+              <div key={season}>
+                <div className="episode-list__season-header">
+                  <h2 className="episode-list__season">Staffel {season}</h2>
+                  <label className="season-mark-all">
+                    <input
+                      type="checkbox"
+                      checked={allWatched}
+                      onChange={(e) => toggleSeason(seasonNumber, e.target.checked)}
+                    />
+                    Staffel als gesehen markieren
+                  </label>
+                </div>
+                {episodes.map((ep) => (
+                  <EpisodeRow key={ep.id} episode={ep} onToggle={toggleEpisode} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -97,6 +117,34 @@ export default function MediaDetail() {
         Aus Watchlist entfernen
       </button>
     </div>
+  );
+}
+
+function EpisodeRow({ episode, onToggle }: { episode: Episode; onToggle: (id: number, watched: boolean) => void }) {
+  const [stillFailed, setStillFailed] = useState(false);
+  const still = !stillFailed ? stillUrl(episode.stillPath) : null;
+
+  return (
+    <label className="episode-row">
+      <input
+        type="checkbox"
+        checked={episode.watched}
+        onChange={(e) => onToggle(episode.id, e.target.checked)}
+      />
+      <div className="episode-row__still">
+        {still ? (
+          <img src={still} alt="" loading="lazy" onError={() => setStillFailed(true)} />
+        ) : (
+          <div className="episode-row__still--placeholder">📺</div>
+        )}
+      </div>
+      <div className="episode-row__info">
+        <div className="episode-row__title">
+          {episode.episodeNumber}. {episode.title ?? "Folge " + episode.episodeNumber}
+        </div>
+        {episode.overview && <div className="episode-row__overview">{episode.overview}</div>}
+      </div>
+    </label>
   );
 }
 

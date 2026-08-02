@@ -101,6 +101,9 @@ export interface TmdbEpisode {
   episode_number: number;
   season_number: number;
   name: string;
+  overview: string;
+  still_path: string | null;
+  vote_average: number;
   air_date: string | null;
 }
 

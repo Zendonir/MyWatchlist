@@ -2,6 +2,7 @@ import mysql, { Pool } from "mysql2/promise";
 import { prisma } from "../db";
 import { env, kodiConfigured } from "../env";
 import { importMovie, importTvShow } from "./mediaImport";
+import { maybeMarkShowWatched } from "../lib/showStatus";
 
 let pool: Pool | null = null;
 
@@ -210,17 +211,8 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
         });
         itemsUpdated += 1;
       }
-    }
 
-    // Mark a show as "watched" once every known episode has been watched.
-    const showsWithEpisodes = await prisma.mediaItem.findMany({
-      where: { mediaType: "tv", status: { not: "watched" } },
-      include: { episodes: true },
-    });
-    for (const show of showsWithEpisodes) {
-      if (show.episodes.length > 0 && show.episodes.every((e) => e.watched)) {
-        await prisma.mediaItem.update({ where: { id: show.id }, data: { status: "watched" } });
-      }
+      await maybeMarkShowWatched(mediaItem.id);
     }
 
     await prisma.syncLog.update({

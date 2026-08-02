@@ -7,6 +7,12 @@ optionally **TVDB**), and can automatically mark things as watched by
 reading play-counts straight out of your **Kodi MySQL video library**.
 Installs as a home-screen app on iPhone (PWA).
 
+Beyond basic tracking: episode overviews and thumbnail images, marking a
+whole season watched in one tap, and a daily metadata refresh that adds
+newly-aired episodes for shows you're tracking (flagged with a "Neu" badge
+on the dashboard until watched) and backfills any missing poster/overview
+data.
+
 ## Architecture
 
 - **Backend**: Node.js/Express + TypeScript, SQLite (via Prisma) for its own

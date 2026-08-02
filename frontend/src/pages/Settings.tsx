@@ -2,22 +2,28 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
 import { useAuth } from "../api/AuthContext";
 
+interface SyncLogEntry {
+  startedAt: string;
+  finishedAt: string | null;
+  status: string;
+  itemsUpdated: number;
+  message: string | null;
+}
+
 interface SyncStatus {
   kodiConfigured: boolean;
-  lastSync: {
-    startedAt: string;
-    finishedAt: string | null;
-    status: string;
-    itemsUpdated: number;
-    message: string | null;
-  } | null;
+  tmdbConfigured: boolean;
+  lastSync: SyncLogEntry | null;
+  lastMetadataRefresh: SyncLogEntry | null;
 }
 
 export default function Settings() {
   const { user, logout } = useAuth();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatus();
@@ -29,15 +35,31 @@ export default function Settings() {
 
   async function triggerSync() {
     setSyncing(true);
-    setMessage(null);
+    setSyncMessage(null);
     try {
       const result = await api.post<{ itemsUpdated: number }>("/sync/kodi");
-      setMessage(`Sync erfolgreich: ${result.itemsUpdated} Eintrag/Einträge aktualisiert.`);
+      setSyncMessage(`Sync erfolgreich: ${result.itemsUpdated} Eintrag/Einträge aktualisiert.`);
       loadStatus();
     } catch (err) {
-      setMessage(err instanceof ApiError ? err.message : "Sync fehlgeschlagen");
+      setSyncMessage(err instanceof ApiError ? err.message : "Sync fehlgeschlagen");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function triggerMetadataRefresh() {
+    setRefreshing(true);
+    setRefreshMessage(null);
+    try {
+      const result = await api.post<{ episodesAdded: number; itemsRefreshed: number }>("/sync/metadata");
+      setRefreshMessage(
+        `Aktualisiert: ${result.episodesAdded} neue Folge(n), ${result.itemsRefreshed} Eintrag/Einträge geprüft.`
+      );
+      loadStatus();
+    } catch (err) {
+      setRefreshMessage(err instanceof ApiError ? err.message : "Aktualisierung fehlgeschlagen");
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -66,10 +88,33 @@ export default function Settings() {
                 {syncing ? "Synchronisiere…" : "Jetzt synchronisieren"}
               </button>
             )}
-            {message && <p className="form-hint">{message}</p>}
+            {syncMessage && <p className="form-hint">{syncMessage}</p>}
           </>
         ) : (
           <p>Kodi-Datenbank ist nicht konfiguriert (siehe README / Umgebungsvariablen).</p>
+        )}
+      </section>
+
+      <section className="settings-section">
+        <h2>Neue Folgen &amp; Metadaten</h2>
+        {status?.tmdbConfigured ? (
+          <>
+            <p>
+              Letzte Aktualisierung:{" "}
+              {status.lastMetadataRefresh
+                ? `${new Date(status.lastMetadataRefresh.startedAt).toLocaleString("de-DE")} - ${status.lastMetadataRefresh.status}`
+                : "noch nie"}
+            </p>
+            <p className="form-hint">Prüft täglich automatisch auf neu erschienene Folgen und fehlende Poster/Infos.</p>
+            {user?.role === "admin" && (
+              <button onClick={triggerMetadataRefresh} disabled={refreshing}>
+                {refreshing ? "Aktualisiere…" : "Jetzt aktualisieren"}
+              </button>
+            )}
+            {refreshMessage && <p className="form-hint">{refreshMessage}</p>}
+          </>
+        ) : (
+          <p>TMDB ist nicht konfiguriert.</p>
         )}
       </section>
     </div>

@@ -60,6 +60,7 @@ export default function Dashboard() {
               posterUrl={posterUrl(item.posterPath)}
               subtitle={subtitle}
               badge={item.mediaType === "tv" ? "Serie" : "Film"}
+              showNewBadge={item.hasNewEpisodes}
             />
           );
         })}

@@ -2,8 +2,19 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { importMovie, importTvShow } from "../services/mediaImport";
+import { maybeMarkShowWatched } from "../lib/showStatus";
 
 export const mediaRouter = Router();
+
+// An episode counts as "newly available" (rather than part of the show's
+// initial import) once it shows up noticeably later than the show itself
+// was added - i.e. added by a later metadata refresh, not the first batch.
+const NEW_EPISODE_MARGIN_MS = 60 * 60 * 1000;
+
+function hasNewUnwatchedEpisodes(item: { addedAt: Date; episodes: { watched: boolean; discoveredAt: Date }[] }) {
+  const threshold = item.addedAt.getTime() + NEW_EPISODE_MARGIN_MS;
+  return item.episodes.some((e) => !e.watched && e.discoveredAt.getTime() > threshold);
+}
 
 mediaRouter.get("/", async (req, res) => {
   const type = typeof req.query.type === "string" ? req.query.type : undefined;
@@ -17,7 +28,8 @@ mediaRouter.get("/", async (req, res) => {
     include: { episodes: { orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }] } },
     orderBy: { updatedAt: "desc" },
   });
-  res.json(items);
+
+  res.json(items.map((item) => ({ ...item, hasNewEpisodes: item.mediaType === "tv" && hasNewUnwatchedEpisodes(item) })));
 });
 
 mediaRouter.get("/:id", async (req, res) => {
@@ -121,10 +133,37 @@ mediaRouter.patch("/:id/episodes/:episodeId", async (req, res) => {
     data: { watched: parsed.data.watched, watchedAt: parsed.data.watched ? new Date() : null },
   });
 
-  const allEpisodes = await prisma.episode.findMany({ where: { mediaItemId } });
-  if (allEpisodes.length > 0 && allEpisodes.every((e) => e.watched)) {
-    await prisma.mediaItem.update({ where: { id: mediaItemId }, data: { status: "watched" } });
-  }
+  await maybeMarkShowWatched(mediaItemId);
 
   res.json(updated);
+});
+
+const seasonUpdateSchema = z.object({ watched: z.boolean() });
+
+mediaRouter.patch("/:id/seasons/:seasonNumber", async (req, res) => {
+  const mediaItemId = Number(req.params.id);
+  const seasonNumber = Number(req.params.seasonNumber);
+  if (!Number.isInteger(mediaItemId) || !Number.isInteger(seasonNumber)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+
+  const parsed = seasonUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+
+  const { count } = await prisma.episode.updateMany({
+    where: { mediaItemId, seasonNumber },
+    data: {
+      watched: parsed.data.watched,
+      watchedAt: parsed.data.watched ? new Date() : null,
+    },
+  });
+  if (count === 0) return res.status(404).json({ error: "Season not found" });
+
+  await maybeMarkShowWatched(mediaItemId);
+
+  const episodes = await prisma.episode.findMany({
+    where: { mediaItemId, seasonNumber },
+    orderBy: { episodeNumber: "asc" },
+  });
+  res.json(episodes);
 });

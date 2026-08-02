@@ -53,9 +53,13 @@ export interface Episode {
   seasonNumber: number;
   episodeNumber: number;
   title: string | null;
+  overview: string | null;
+  stillPath: string | null;
+  voteAverage: number | null;
   airDate: string | null;
   watched: boolean;
   watchedAt: string | null;
+  discoveredAt: string;
 }
 
 export interface MediaItem {
@@ -73,6 +77,7 @@ export interface MediaItem {
   watched: boolean;
   watchedAt: string | null;
   episodes: Episode[];
+  hasNewEpisodes?: boolean;
 }
 
 export interface SearchResult {
@@ -85,6 +90,11 @@ export interface SearchResult {
 }
 
 export function posterUrl(path: string | null, size: "w200" | "w342" | "w500" = "w342") {
+  if (!path) return null;
+  return `https://image.tmdb.org/t/p/${size}${path}`;
+}
+
+export function stillUrl(path: string | null, size: "w185" | "w300" = "w300") {
   if (!path) return null;
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }

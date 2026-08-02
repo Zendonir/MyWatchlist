@@ -1,6 +1,19 @@
 import { prisma } from "../db";
 import * as tmdb from "./tmdb";
 
+export function episodeCreateData(mediaItemId: number, ep: tmdb.TmdbEpisode) {
+  return {
+    mediaItemId,
+    seasonNumber: ep.season_number,
+    episodeNumber: ep.episode_number,
+    title: ep.name,
+    overview: ep.overview || null,
+    stillPath: ep.still_path,
+    voteAverage: ep.vote_average || null,
+    airDate: ep.air_date,
+  };
+}
+
 export async function importMovie(tmdbId: number) {
   const details = await tmdb.getMovieDetails(tmdbId);
   return prisma.mediaItem.create({
@@ -39,13 +52,7 @@ export async function importTvShow(tmdbId: number) {
     // SQLite's createMany doesn't support skipDuplicates, but season/episode
     // numbers from TMDB are unique per show, so plain inserts are safe here.
     await prisma.episode.createMany({
-      data: seasonDetails.episodes.map((ep) => ({
-        mediaItemId: item.id,
-        seasonNumber: ep.season_number,
-        episodeNumber: ep.episode_number,
-        title: ep.name,
-        airDate: ep.air_date,
-      })),
+      data: seasonDetails.episodes.map((ep) => episodeCreateData(item.id, ep)),
     });
   }
 
