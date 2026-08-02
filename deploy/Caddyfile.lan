@@ -1,12 +1,15 @@
-# LAN-only HTTPS using Caddy's self-signed "internal" CA - no domain name,
-# public DNS, or port-forwarding required. The very first visit shows a
-# browser warning ("connection not private") because that CA isn't in your
-# OS/browser trust store; click through it once ("Advanced -> proceed") and
-# every request afterwards is genuine HTTPS, so browsers stop trying to
-# silently upgrade individual requests to a scheme the app doesn't speak.
+# LAN-only HTTPS using a static self-signed certificate (generated once by
+# the caddy service's entrypoint - see docker-compose.caddy-lan.yml - into
+# /certs, which this file just loads). Static files instead of Caddy's own
+# "tls internal" automatic issuance, which can fail with a TLS-level
+# "internal error" during the handshake in some container environments.
+#
+# The very first visit shows a browser warning ("connection not private")
+# because that self-signed cert isn't in your OS/browser trust store;
+# click through it once ("Advanced -> proceed") and it works from then on.
 
 :443 {
-	tls internal
+	tls /certs/cert.pem /certs/key.pem
 
 	encode gzip
 	header {

@@ -1,25 +1,26 @@
 # MyWatchlist - single-file HTTPS install for TrueNAS SCALE ("Install via
-# YAML"). Runs the app plus a Caddy reverse proxy with a self-signed local
-# certificate, published on host port 3000 (so you open
-# https://<truenas-ip>:3000 - note the https://, not http://).
+# YAML"). Runs the app plus a Caddy reverse proxy with a self-signed
+# certificate generated at first start, published on host port 3000 (so
+# you open https://<truenas-ip>:3000 - note the https://, not http://).
 #
 # Why HTTPS at all: modern browsers increasingly assume every site speaks
 # HTTPS and can misbehave (upgrading individual asset requests on their own)
-# against a plain-HTTP app. Caddy's "tls internal" gives the app a real,
-# though self-signed, certificate so that stops happening. Your browser
-# will warn once per device ("connection not private") - click through it
-# ("Advanced" -> "Proceed") and it won't ask again.
+# against a plain-HTTP app. A real, though self-signed, certificate stops
+# that. Your browser will warn once per device ("connection not private")
+# - click through it ("Advanced" -> "Proceed") and it won't ask again.
 #
 # Before pasting this in:
-#   1. Fill in SESSION_SECRET, APP_USERNAME, APP_PASSWORD and TMDB_API_KEY
-#      below (see the main README for where to get a TMDB key and how to
+#   1. Set LAN_IP below to this machine's LAN IP (e.g. 192.168.1.2) - it's
+#      baked into the certificate so the browser's hostname check passes.
+#   2. Fill in SESSION_SECRET, APP_USERNAME, APP_PASSWORD and TMDB_API_KEY
+#      (see the main README for where to get a TMDB key and how to
 #      generate SESSION_SECRET).
-#   2. Make sure the ghcr.io/zendonir/mywatchlist package is set to "Public"
+#   3. Make sure the ghcr.io/zendonir/mywatchlist package is set to "Public"
 #      visibility on GitHub (Profile -> Packages), otherwise pulling the
 #      image anonymously will fail with "denied".
-#   3. Kodi/TVDB variables are optional - leave them empty to disable sync.
+#   4. Kodi/TVDB variables are optional - leave them empty to disable sync.
 #
-# After starting: open https://<truenas-ip>:3000
+# After starting: open https://<LAN_IP>:3000
 
 services:
   mywatchlist:
@@ -63,6 +64,9 @@ services:
     image: caddy:2-alpine
     container_name: mywatchlist-caddy
     restart: unless-stopped
+    environment:
+      # This machine's LAN IP - baked into the certificate as its subject.
+      LAN_IP: "REPLACE_ME_LAN_IP"
     ports:
       # host:container - change the "3000" on the left if you want a
       # different external port; the app always speaks HTTPS on it.
@@ -70,9 +74,17 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
+        if [ ! -f /certs/cert.pem ]; then
+          apk add --no-cache openssl >/dev/null
+          openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout /certs/key.pem -out /certs/cert.pem \
+            -subj "/CN=$${LAN_IP}" \
+            -addext "subjectAltName=IP:$${LAN_IP},IP:127.0.0.1,DNS:localhost"
+        fi
         cat <<'EOF' > /etc/caddy/Caddyfile
         :443 {
-          tls internal
+          tls /certs/cert.pem /certs/key.pem
           encode gzip
           header {
             X-Content-Type-Options "nosniff"
@@ -84,12 +96,12 @@ services:
         EOF
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
-      - caddy_data:/data
+      - caddy_certs:/certs
       - caddy_config:/config
     depends_on:
       - mywatchlist
 
 volumes:
   mywatchlist_data:
-  caddy_data:
+  caddy_certs:
   caddy_config:

@@ -1,33 +1,48 @@
 # LAN-only HTTPS overlay: adds Caddy in front of MyWatchlist using a
-# self-signed local CA (Caddy's "tls internal") instead of a public domain +
-# Let's Encrypt. No DOMAIN, no port-forwarding, no public DNS needed - just
-# for reaching the app securely over your home network by IP.
+# self-signed certificate generated once at first start, instead of a
+# public domain + Let's Encrypt. No DOMAIN, no port-forwarding, no public
+# DNS needed - just for reaching the app securely over your home network.
+#
+# Set LAN_IP in your .env to this machine's LAN IP (e.g. 192.168.1.2) -
+# it's baked into the certificate so the browser's hostname check passes.
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f deploy/docker-compose.caddy-lan.yml up -d
 #
-# Then open: https://<truenas-ip>  (port 443 - no :3000 needed anymore)
+# Then open: https://<LAN_IP>  (port 443 - no :3000 needed)
 # The browser will warn once that the certificate isn't trusted - that's
-# expected for a self-signed local CA. Accept it ("Advanced -> proceed") and
-# it won't ask again for that browser/device.
+# expected for a self-signed cert. Accept it ("Advanced -> proceed") and it
+# won't ask again for that browser/device.
 
 services:
   caddy:
     image: caddy:2-alpine
     container_name: mywatchlist-caddy
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "80:80"
       - "443:443"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -f /certs/cert.pem ]; then
+          apk add --no-cache openssl >/dev/null
+          openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+            -keyout /certs/key.pem -out /certs/cert.pem \
+            -subj "/CN=$${LAN_IP}" \
+            -addext "subjectAltName=IP:$${LAN_IP},IP:127.0.0.1,DNS:localhost"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - ./deploy/Caddyfile.lan:/etc/caddy/Caddyfile:ro
-      - caddy_lan_data:/data
-      - caddy_lan_config:/config
+      - caddy_lan_certs:/certs
     networks:
       - mywatchlist_net
     depends_on:
       - mywatchlist
 
 volumes:
-  caddy_lan_data:
-  caddy_lan_config:
+  caddy_lan_certs:
