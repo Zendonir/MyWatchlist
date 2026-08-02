@@ -37,6 +37,13 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    // The app itself never terminates TLS - it's plain HTTP unless a reverse
+    // proxy (e.g. the bundled Caddy setup) sits in front of it. Helmet's
+    // default Strict-Transport-Security header asserts HTTPS regardless,
+    // which can get a browser to remember/enforce HTTPS for this host even
+    // for direct HTTP-only LAN access. Let the reverse proxy set HSTS
+    // instead (ours already does, see deploy/Caddyfile).
+    hsts: false,
   })
 );
 
