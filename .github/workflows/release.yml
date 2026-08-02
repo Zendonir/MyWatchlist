@@ -65,6 +65,7 @@ jobs:
           generate_release_notes: true
           files: |
             deploy/truenas-install.yaml
+            deploy/truenas-install-https.yaml
             docker-compose.yml
             deploy/docker-compose.caddy.yml
             deploy/Caddyfile
