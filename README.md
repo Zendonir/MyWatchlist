@@ -99,8 +99,9 @@ if it isn't yet).
    in `.env`. Leave `KODI_DB_NAME_PREFIX` at its default (`MyVideos`) unless
    you use a custom prefix.
 3. Restart the container. Sync runs automatically on the `KODI_SYNC_CRON`
-   schedule (default every 30 minutes) and can be triggered manually from
-   **Settings → Kodi-Synchronisierung** (admin accounts only).
+   schedule (default once a day at 03:00 - use a shorter interval like
+   `*/30 * * * *` for more frequent updates) and can be triggered manually
+   from **Settings → Kodi-Synchronisierung** (admin accounts only).
 
 **Which database it picks**: `KODI_DB_NAME_PREFIX` is a prefix, not the
 full database name. On every sync, the app lists all databases on the
@@ -109,12 +110,20 @@ and always uses whichever has the **highest number** - i.e. whatever Kodi's
 current schema version actually is, without needing to update `.env` after
 a Kodi upgrade creates a new database.
 
-**How matching works**: the sync matches Kodi's movies/episodes to your
-watchlist via Kodi's `uniqueid` table (which stores each item's TMDB ID, as
-long as you're scraping with a TMDB-based scraper in Kodi - the default
-"The Movie Database" / "TheTVDB" scrapers do this from Kodi 19+). Items Kodi
-has no TMDB id for (e.g. only scraped from IMDB in older libraries) can't be
-auto-matched; mark those watched manually in the app.
+**How matching works**: the sync matches Kodi's movies/episodes to TMDB via
+Kodi's `uniqueid` table (which stores each item's TMDB ID, as long as you're
+scraping with a TMDB-based scraper in Kodi - the default "The Movie
+Database" / "TheTVDB" scrapers do this from Kodi 19+). Items Kodi has no
+TMDB id for (e.g. only scraped from IMDB in older libraries) can't be
+auto-matched; add and mark those watched manually in the app.
+
+**Watched items are imported automatically** - anything in your Kodi
+library with a play count greater than zero is added to your watchlist
+(fetching metadata from TMDB) and marked watched if it isn't already
+there, not just matched against items you added by hand. A first sync
+against a large library can take a while and make a lot of TMDB requests
+(one per movie/show, plus one per season for shows); subsequent syncs are
+fast since only newly-watched items trigger new TMDB lookups.
 
 Season/episode numbers are read via Kodi's `episode_view` using column names
 that are correct for most modern Kodi schema versions, but can shift on very

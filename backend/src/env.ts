@@ -28,7 +28,7 @@ const schema = z.object({
     .string()
     .regex(/^[A-Za-z0-9_]+$/, "must be alphanumeric/underscore only, e.g. MyVideos")
     .default("MyVideos"),
-  KODI_SYNC_CRON: z.string().default("*/30 * * * *"),
+  KODI_SYNC_CRON: z.string().default("0 3 * * *"),
   // Column names for season/episode number in the `episode_view` view.
   // These are content columns (c12/c13) that are historically stable but can
   // shift between major Kodi schema versions - override if `runKodiSync`

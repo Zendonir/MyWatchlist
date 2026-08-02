@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
-import * as tmdb from "../services/tmdb";
+import { importMovie, importTvShow } from "../services/mediaImport";
 
 export const mediaRouter = Router();
 
@@ -51,53 +51,11 @@ mediaRouter.post("/", async (req, res) => {
 
   try {
     if (mediaType === "movie") {
-      const details = await tmdb.getMovieDetails(tmdbId);
-      const item = await prisma.mediaItem.create({
-        data: {
-          mediaType: "movie",
-          tmdbId: details.id,
-          title: details.title,
-          originalTitle: details.original_title,
-          overview: details.overview,
-          posterPath: details.poster_path,
-          backdropPath: details.backdrop_path,
-          releaseDate: details.release_date,
-        },
-      });
+      const item = await importMovie(tmdbId);
       return res.status(201).json(item);
     }
 
-    const details = await tmdb.getTvDetails(tmdbId);
-    const item = await prisma.mediaItem.create({
-      data: {
-        mediaType: "tv",
-        tmdbId: details.id,
-        tvdbId: details.external_ids?.tvdb_id ?? undefined,
-        title: details.name,
-        originalTitle: details.original_name,
-        overview: details.overview,
-        posterPath: details.poster_path,
-        backdropPath: details.backdrop_path,
-        releaseDate: details.first_air_date,
-      },
-    });
-
-    for (const season of details.seasons) {
-      if (season.season_number === 0) continue; // skip "specials"
-      const seasonDetails = await tmdb.getSeasonDetails(tmdbId, season.season_number);
-      // SQLite's createMany doesn't support skipDuplicates, but season/episode
-      // numbers from TMDB are unique per show, so plain inserts are safe here.
-      await prisma.episode.createMany({
-        data: seasonDetails.episodes.map((ep) => ({
-          mediaItemId: item.id,
-          seasonNumber: ep.season_number,
-          episodeNumber: ep.episode_number,
-          title: ep.name,
-          airDate: ep.air_date,
-        })),
-      });
-    }
-
+    const item = await importTvShow(tmdbId);
     const full = await prisma.mediaItem.findUnique({
       where: { id: item.id },
       include: { episodes: { orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }] } },

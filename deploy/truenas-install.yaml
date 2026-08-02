@@ -54,7 +54,7 @@ services:
       KODI_DB_USER: ""
       KODI_DB_PASSWORD: ""
       KODI_DB_NAME_PREFIX: "MyVideos"
-      KODI_SYNC_CRON: "*/30 * * * *"
+      KODI_SYNC_CRON: "0 3 * * *"
     volumes:
       - mywatchlist_data:/app/data
 

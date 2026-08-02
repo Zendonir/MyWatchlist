@@ -1,6 +1,7 @@
 import mysql, { Pool } from "mysql2/promise";
 import { prisma } from "../db";
 import { env, kodiConfigured } from "../env";
+import { importMovie, importTvShow } from "./mediaImport";
 
 let pool: Pool | null = null;
 
@@ -148,40 +149,67 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
       const tmdbId = Number(row.tmdbId);
       if (!Number.isFinite(tmdbId)) continue;
 
-      const result = await prisma.mediaItem.updateMany({
-        where: { mediaType: "movie", tmdbId, watched: false },
+      let mediaItem = await prisma.mediaItem.findUnique({
+        where: { mediaType_tmdbId: { mediaType: "movie", tmdbId } },
+      });
+      if (!mediaItem) {
+        try {
+          mediaItem = await importMovie(tmdbId);
+        } catch {
+          continue; // TMDB lookup failed - try again on the next sync
+        }
+      }
+      if (mediaItem.watched) continue;
+
+      await prisma.mediaItem.update({
+        where: { id: mediaItem.id },
         data: { watched: true, watchedAt: new Date(), status: "watched", kodiId: row.idMovie },
       });
-      itemsUpdated += result.count;
+      itemsUpdated += 1;
     }
 
+    // Group episodes by show so a missing show is only imported once.
     const episodeRows = await fetchWatchedEpisodes(dbName);
+    const episodesByShow = new Map<number, KodiEpisodeRow[]>();
     for (const row of episodeRows) {
       if (!row.showTmdbId) continue;
       const showTmdbId = Number(row.showTmdbId);
       if (!Number.isFinite(showTmdbId)) continue;
+      const rows = episodesByShow.get(showTmdbId) ?? [];
+      rows.push(row);
+      episodesByShow.set(showTmdbId, rows);
+    }
 
-      const mediaItem = await prisma.mediaItem.findUnique({
+    for (const [showTmdbId, rows] of episodesByShow) {
+      let mediaItem = await prisma.mediaItem.findUnique({
         where: { mediaType_tmdbId: { mediaType: "tv", tmdbId: showTmdbId } },
       });
-      if (!mediaItem) continue;
+      if (!mediaItem) {
+        try {
+          mediaItem = await importTvShow(showTmdbId);
+        } catch {
+          continue; // TMDB lookup failed - try again on the next sync
+        }
+      }
 
-      const episode = await prisma.episode.findUnique({
-        where: {
-          mediaItemId_seasonNumber_episodeNumber: {
-            mediaItemId: mediaItem.id,
-            seasonNumber: row.season,
-            episodeNumber: row.episode,
+      for (const row of rows) {
+        const episode = await prisma.episode.findUnique({
+          where: {
+            mediaItemId_seasonNumber_episodeNumber: {
+              mediaItemId: mediaItem.id,
+              seasonNumber: row.season,
+              episodeNumber: row.episode,
+            },
           },
-        },
-      });
-      if (!episode || episode.watched) continue;
+        });
+        if (!episode || episode.watched) continue;
 
-      await prisma.episode.update({
-        where: { id: episode.id },
-        data: { watched: true, watchedAt: new Date() },
-      });
-      itemsUpdated += 1;
+        await prisma.episode.update({
+          where: { id: episode.id },
+          data: { watched: true, watchedAt: new Date() },
+        });
+        itemsUpdated += 1;
+      }
     }
 
     // Mark a show as "watched" once every known episode has been watched.
