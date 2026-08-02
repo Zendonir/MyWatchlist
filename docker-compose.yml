@@ -1,0 +1,26 @@
+services:
+  mywatchlist:
+    build: .
+    image: mywatchlist:latest
+    container_name: mywatchlist
+    restart: unless-stopped
+    # No ports are published to the host by default - reach the app through
+    # the bundled Caddy reverse proxy (deploy/docker-compose.caddy.yml) which
+    # terminates TLS, or uncomment the line below for local-only testing.
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=file:/app/data/mywatchlist.db
+    volumes:
+      - mywatchlist_data:/app/data
+    networks:
+      - mywatchlist_net
+
+volumes:
+  mywatchlist_data:
+
+networks:
+  mywatchlist_net:
+    driver: bridge

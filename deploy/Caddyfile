@@ -1,0 +1,21 @@
+{
+	email admin@{$DOMAIN}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	# Basic per-IP rate limiting on top of the app's own login throttling
+	# would normally go here via a plugin (e.g. caddy-ratelimit). The stock
+	# Caddy image doesn't include it - see README for how to add it if you
+	# want defense in depth beyond the app-level rate limiting.
+
+	reverse_proxy mywatchlist:3000
+}

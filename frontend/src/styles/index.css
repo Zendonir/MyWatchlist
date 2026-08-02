@@ -1,0 +1,366 @@
+:root {
+  --bg: #0b1120;
+  --bg-elevated: #161f36;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-contrast: #ffffff;
+  --danger: #ef4444;
+  --border: #262f47;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8fafc;
+    --bg-elevated: #ffffff;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --border: #e2e8f0;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+button {
+  font-family: inherit;
+  font-size: 16px; /* prevents iOS Safari zoom-on-focus */
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+.page {
+  padding: 16px 16px 8px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.page__title {
+  font-size: 1.5rem;
+  margin: 0 0 12px;
+}
+
+.centered-message {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 16px;
+}
+
+/* Bottom nav */
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 0 8px;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.bottom-nav__item--active {
+  color: var(--accent);
+}
+
+.bottom-nav__icon {
+  font-size: 1.4rem;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.tabs__item {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.tabs__item--active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+/* Media grid + cards */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+.media-card__link {
+  display: block;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+  width: 100%;
+}
+
+.media-card__poster {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.media-card__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-card__poster--placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+}
+
+.media-card__badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.media-card__title {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.media-card__subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Forms */
+.login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h1 {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="search"] {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+button[type="submit"],
+.settings-section button,
+.status-picker__item,
+.danger-button {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-weight: 600;
+}
+
+.danger-button {
+  background: var(--danger);
+  width: 100%;
+  margin-top: 24px;
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.form-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.search-bar {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.search-bar input {
+  flex: 1;
+}
+
+.search-bar button {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+}
+
+/* Detail page */
+.detail-header {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.detail-poster {
+  width: 120px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.detail-meta {
+  color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.detail-overview {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.status-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.status-picker__item {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.status-picker__item--active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.episode-list__season {
+  font-size: 1rem;
+  margin: 16px 0 8px;
+  color: var(--text-muted);
+}
+
+.episode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.episode-row input {
+  width: 20px;
+  height: 20px;
+}
+
+.settings-section {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.settings-section h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "mywatchlist-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MyWatchlist backend API - watchlist tracking with Kodi sync and TMDB/TVDB metadata",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.0",
+    "express-session": "^1.18.1",
+    "helmet": "^7.1.0",
+    "mysql2": "^3.11.3",
+    "node-cron": "^3.0.3",
+    "prisma": "^5.20.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^4.17.21",
+    "@types/express-session": "^1.18.0",
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2"
+  }
+}

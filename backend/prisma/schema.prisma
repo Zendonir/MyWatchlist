@@ -1,0 +1,71 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("user") // "admin" | "user"
+  createdAt    DateTime @default(now())
+}
+
+// Backing store for express-session so sessions survive container restarts.
+model Session {
+  sid       String   @id
+  data      String
+  expiresAt DateTime
+}
+
+model MediaItem {
+  id            Int       @id @default(autoincrement())
+  mediaType     String // "movie" | "tv"
+  tmdbId        Int
+  tvdbId        Int?
+  title         String
+  originalTitle String?
+  overview      String?
+  posterPath    String?
+  backdropPath  String?
+  releaseDate   String?
+  status        String    @default("watchlist") // watchlist | watching | watched | dropped
+  userRating    Float?
+  notes         String?
+  watched       Boolean   @default(false) // relevant for movies
+  watchedAt     DateTime?
+  kodiId        Int? // idMovie / idShow in the Kodi video library, once matched
+  addedAt       DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  episodes      Episode[]
+
+  @@unique([mediaType, tmdbId])
+}
+
+model Episode {
+  id            Int       @id @default(autoincrement())
+  mediaItemId   Int
+  mediaItem     MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+  seasonNumber  Int
+  episodeNumber Int
+  title         String?
+  airDate       String?
+  watched       Boolean   @default(false)
+  watchedAt     DateTime?
+
+  @@unique([mediaItemId, seasonNumber, episodeNumber])
+}
+
+model SyncLog {
+  id           Int       @id @default(autoincrement())
+  source       String // "kodi"
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  itemsUpdated Int       @default(0)
+  status       String    @default("running") // running | success | error
+  message      String?
+}

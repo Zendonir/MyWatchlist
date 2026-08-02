@@ -1,0 +1,35 @@
+# Overlay that adds a Caddy reverse proxy in front of MyWatchlist, giving it
+# automatic HTTPS (via Let's Encrypt) for a domain that points at this host.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d
+#
+# Requires:
+#   - DOMAIN set in .env (e.g. watchlist.example.com) pointing at this host
+#   - ports 80 and 443 forwarded to this machine from your router/firewall
+#
+# See README.md "Externer Zugriff & Sicherheit" for the recommended
+# alternative of a VPN or Cloudflare Tunnel instead of exposing 80/443.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: mywatchlist-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - mywatchlist_net
+    depends_on:
+      - mywatchlist
+
+volumes:
+  caddy_data:
+  caddy_config:

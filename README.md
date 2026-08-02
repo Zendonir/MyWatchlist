@@ -1,0 +1,175 @@
+# MyWatchlist
+
+Self-hosted watchlist for movies and TV shows. Runs as a single Docker
+container, packaged for TrueNAS. Tracks what you plan to watch / are
+watching / have watched, pulls posters and metadata from **TMDB** (and
+optionally **TVDB**), and can automatically mark things as watched by
+reading play-counts straight out of your **Kodi MySQL video library**.
+Installs as a home-screen app on iPhone (PWA).
+
+## Architecture
+
+- **Backend**: Node.js/Express + TypeScript, SQLite (via Prisma) for its own
+  data, `mysql2` for a **read-only** connection to Kodi's video database.
+- **Frontend**: React + Vite, mobile-first, installable as a PWA (manifest +
+  service worker, `apple-touch-icon` for iOS "Add to Home Screen").
+- Both are built into **one Docker image**; Express serves the built
+  frontend and the `/api/*` REST API from the same origin.
+- Session-based auth (bcrypt-hashed passwords, HTTP-only cookies), rate
+  limiting on login, and security headers via Helmet.
+
+## Quick start (TrueNAS / any Docker host)
+
+1. Clone this repo onto your TrueNAS box (or wherever `docker compose` runs).
+2. Copy the environment template and fill it in:
+   ```bash
+   cp .env.example .env
+   ```
+   At minimum set `SESSION_SECRET`, `APP_USERNAME`, `APP_PASSWORD`, and a
+   `TMDB_API_KEY` (see below). Kodi and TVDB settings are optional.
+3. Build and start:
+   ```bash
+   docker compose up -d --build
+   ```
+   By default the app is **not** published to the host at all - see
+   "Externer Zugriff & Sicherheit" below for how to actually reach it.
+4. Log in with the `APP_USERNAME`/`APP_PASSWORD` you set. That account is
+   created automatically on first boot (only if no users exist yet).
+
+On TrueNAS Scale, this repo's `docker-compose.yml` can be used directly with
+the "Launch Docker Compose" / custom app import feature, or you can run
+`docker compose` from a shell (e.g. via an app that gives you a terminal, or
+SSH into the NAS if you allow that).
+
+## TMDB / TVDB API keys
+
+- **TMDB** (required for search/metadata): create a free account at
+  https://www.themoviedb.org, then generate a key under
+  *Settings → API*. Either the "API Key (v3 auth)" (`TMDB_API_KEY`) or the
+  "API Read Access Token (v4 auth)" (`TMDB_ACCESS_TOKEN`) works.
+- **TVDB** (optional, supplemental TV metadata): create a key at
+  https://thetvdb.com/dashboard/account/apikey and set `TVDB_API_KEY`.
+
+Both keys stay server-side; the browser never talks to TMDB/TVDB directly.
+
+## Kodi MySQL sync
+
+MyWatchlist can read Kodi's watched status directly out of Kodi's **MySQL**
+video library (this requires Kodi to already be configured to use MySQL
+instead of the default SQLite file - see the [Kodi wiki on MySQL](https://kodi.wiki/view/MySQL)
+if it isn't yet).
+
+1. Create a **read-only** MySQL user for this app (never give it write
+   access - it should never modify your Kodi library):
+   ```sql
+   CREATE USER 'mywatchlist'@'%' IDENTIFIED BY 'choose-a-strong-password';
+   GRANT SELECT ON MyVideos121.* TO 'mywatchlist'@'%';
+   FLUSH PRIVILEGES;
+   ```
+   (Replace `MyVideos121` with your actual Kodi video DB name/version - check
+   Kodi's `advancedsettings.xml` under `<videodatabase><name>`.)
+2. Fill in `KODI_DB_HOST`, `KODI_DB_PORT`, `KODI_DB_USER`, `KODI_DB_PASSWORD`,
+   `KODI_DB_NAME` in `.env`.
+3. Restart the container. Sync runs automatically on the `KODI_SYNC_CRON`
+   schedule (default every 30 minutes) and can be triggered manually from
+   **Settings → Kodi-Synchronisierung** (admin accounts only).
+
+**How matching works**: the sync matches Kodi's movies/episodes to your
+watchlist via Kodi's `uniqueid` table (which stores each item's TMDB ID, as
+long as you're scraping with a TMDB-based scraper in Kodi - the default
+"The Movie Database" / "TheTVDB" scrapers do this from Kodi 19+). Items Kodi
+has no TMDB id for (e.g. only scraped from IMDB in older libraries) can't be
+auto-matched; mark those watched manually in the app.
+
+Season/episode numbers are read via Kodi's `episode_view` using column names
+that are correct for most modern Kodi schema versions, but can shift on very
+old/new Kodi releases. If sync logs (`Settings` page, or container logs)
+show mismatched episodes, run `DESCRIBE episode_view;` against your Kodi DB
+and adjust `KODI_EPISODE_SEASON_COLUMN` / `KODI_EPISODE_NUMBER_COLUMN` in
+`.env` accordingly.
+
+## Externer Zugriff & Sicherheit
+
+The app is already hardened for exposure (bcrypt passwords, HTTP-only
+session cookies, per-IP login rate limiting, Helmet security headers, CSRF
+mitigation, non-root container user, read-only Kodi DB access). How you get
+external traffic to it matters just as much:
+
+**Recommended, in order of preference:**
+
+1. **VPN (best)** - use TrueNAS Scale's / your router's built-in WireGuard,
+   or Tailscale, to reach your home network, then hit MyWatchlist over its
+   internal address. Nothing is exposed to the internet at all.
+2. **Cloudflare Tunnel** - exposes the app via Cloudflare without opening any
+   inbound ports on your router, and gets you free TLS + Cloudflare's edge
+   protection. Point the tunnel at `mywatchlist:3000` on the Docker network.
+3. **Reverse proxy with TLS, port-forwarded** - only if 1/2 aren't options.
+   This repo includes a Caddy overlay that gets you automatic HTTPS via
+   Let's Encrypt for a real domain:
+   ```bash
+   docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d --build
+   ```
+   Set `DOMAIN=watchlist.yourdomain.com` in `.env` first, and forward only
+   ports 80/443 to this host (never forward 3000 directly).
+
+**Regardless of which option you pick:**
+
+- Set a strong, unique `APP_PASSWORD` and a random `SESSION_SECRET`
+  (`openssl rand -base64 48`).
+- Consider adding a firewall rule / fail2ban-style tool (TrueNAS Scale apps
+  like CrowdSec, or your router's) watching for repeated `401` responses on
+  `/api/auth/login`, as defense in depth beyond the app's built-in rate
+  limit.
+- Keep the container updated (`docker compose pull && docker compose up -d`
+  if you push image updates to a registry, or rebuild from a pulled repo).
+
+## Adding more users
+
+The account from `APP_USERNAME`/`APP_PASSWORD` is an admin. Additional
+family members can be added by an admin via:
+
+```bash
+curl -X POST https://your-host/api/users \
+  -H 'Content-Type: application/json' -H 'X-Requested-With: MyWatchlist' \
+  -b cookies.txt \
+  -d '{"username":"partner","password":"a-strong-password","role":"user"}'
+```
+
+(A settings-page UI for this is a possible future improvement; for now it's
+API-only.)
+
+## Installing on iPhone
+
+Open the site in Safari, tap the Share icon, then **"Zum Home-Bildschirm"**
+("Add to Home Screen"). It launches full-screen, without Safari's UI, and
+works like a native app icon.
+
+## Environment variables
+
+See `.env.example` for the full list with comments.
+
+## Local development (without Docker)
+
+```bash
+# Backend
+cd backend
+cp ../.env.example .env   # edit DATABASE_URL to e.g. file:./dev.db
+npm install
+npx prisma migrate dev
+npm run dev               # listens on :3000
+
+# Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev                # listens on :5173, proxies /api to :3000
+```
+
+## Data & backups
+
+All app data (SQLite database) lives in the `mywatchlist_data` Docker
+volume. Back it up like any other Docker volume, e.g.:
+
+```bash
+docker run --rm -v mywatchlist_data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/mywatchlist-backup.tar.gz -C /data .
+```
