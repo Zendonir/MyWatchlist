@@ -147,6 +147,19 @@ external traffic to it matters just as much:
    Set `DOMAIN=watchlist.yourdomain.com` in `.env` first, and forward only
    ports 80/443 to this host (never forward 3000 directly).
 
+**LAN-only HTTPS (no domain, no port-forwarding):** modern browsers
+increasingly assume HTTPS everywhere and can misbehave against a plain-HTTP
+app (e.g. upgrading individual asset requests to HTTPS on their own,
+breaking the page). If you only need this reachable inside your home
+network by IP, use the LAN overlay instead - it gives the app a real,
+self-signed certificate via Caddy's local CA:
+```bash
+docker compose -f docker-compose.yml -f deploy/docker-compose.caddy-lan.yml up -d --build
+```
+Then open `https://<truenas-ip>` (port 443, not `:3000`). The browser warns
+once that the certificate isn't trusted (expected, self-signed) - accept it
+("Advanced" -> "Proceed") and it won't ask again on that device.
+
 **Regardless of which option you pick:**
 
 - Set a strong, unique `APP_PASSWORD` and a random `SESSION_SECRET`

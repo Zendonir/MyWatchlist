@@ -68,4 +68,6 @@ jobs:
             docker-compose.yml
             deploy/docker-compose.caddy.yml
             deploy/Caddyfile
+            deploy/docker-compose.caddy-lan.yml
+            deploy/Caddyfile.lan
             .env.example

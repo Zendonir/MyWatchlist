@@ -1,0 +1,23 @@
+# LAN-only HTTPS using Caddy's self-signed "internal" CA - no domain name,
+# public DNS, or port-forwarding required. The very first visit shows a
+# browser warning ("connection not private") because that CA isn't in your
+# OS/browser trust store; click through it once ("Advanced -> proceed") and
+# every request afterwards is genuine HTTPS, so browsers stop trying to
+# silently upgrade individual requests to a scheme the app doesn't speak.
+
+:443 {
+	tls internal
+
+	encode gzip
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	reverse_proxy mywatchlist:3000
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}
