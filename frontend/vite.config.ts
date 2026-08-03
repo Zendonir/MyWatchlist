@@ -31,17 +31,18 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/,
-            handler: "CacheFirst",
+            // StaleWhileRevalidate instead of CacheFirst: always re-fetches
+            // in the background and updates the cache, so a previously
+            // failed/opaque response (TMDB's CDN doesn't reliably support
+            // anonymous CORS, so <img> tags intentionally don't set
+            // crossorigin - meaning these responses stay opaque and can't be
+            // filtered by status) self-heals within one extra load instead
+            // of being stuck for the full cache lifetime.
+            handler: "StaleWhileRevalidate",
             options: {
-              // "v2" so upgrading to this version starts with a clean cache -
-              // the previous config had no cacheableResponse restriction, so
-              // any image that failed to load while <img> tags lacked
-              // crossorigin (making the response "opaque", status always
-              // reported as 0) got cached as if it had succeeded, and would
-              // keep being served as broken forever after.
-              cacheName: "tmdb-images-v2",
-              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
-              cacheableResponse: { statuses: [0, 200] },
+              // "v3": bust the caches from earlier, more aggressive configs.
+              cacheName: "tmdb-images-v3",
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 3 },
             },
           },
         ],
