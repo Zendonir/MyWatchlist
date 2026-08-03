@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { tmdbConfigured } from "../env";
 import * as tmdb from "./tmdb";
-import { episodeCreateData } from "./mediaImport";
+import { episodeCreateData, tvStatusFields } from "./mediaImport";
 
 /**
  * Refreshes tracked shows against TMDB: adds episodes for seasons that
@@ -43,16 +43,18 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
           episodesAdded += newEpisodes.length;
         }
 
-        if (!show.posterPath || !show.backdropPath || !show.overview) {
-          await prisma.mediaItem.update({
-            where: { id: show.id },
-            data: {
-              posterPath: show.posterPath ?? details.poster_path,
-              backdropPath: show.backdropPath ?? details.backdrop_path,
-              overview: show.overview ?? details.overview,
-            },
-          });
-        }
+        // Production status is refreshed unconditionally, not just when
+        // missing: a show moves from "Returning Series" to "Ended" over time,
+        // and a stale value is worse than no value here.
+        await prisma.mediaItem.update({
+          where: { id: show.id },
+          data: {
+            posterPath: show.posterPath ?? details.poster_path,
+            backdropPath: show.backdropPath ?? details.backdrop_path,
+            overview: show.overview ?? details.overview,
+            ...tvStatusFields(details),
+          },
+        });
 
         itemsRefreshed += 1;
       } catch {
@@ -60,9 +62,10 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
       }
     }
 
-    const movies = await prisma.mediaItem.findMany({
-      where: { mediaType: "movie", OR: [{ posterPath: null }, { backdropPath: null }, { overview: null }] },
-    });
+    // All movies, not just ones missing artwork: isAnime defaults to false, so
+    // there's no way to tell "not anime" from "never classified", and items
+    // imported before that field existed need a pass to get categorised.
+    const movies = await prisma.mediaItem.findMany({ where: { mediaType: "movie" } });
     for (const movie of movies) {
       try {
         const details = await tmdb.getMovieDetails(movie.tmdbId);
@@ -72,6 +75,7 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
             posterPath: movie.posterPath ?? details.poster_path,
             backdropPath: movie.backdropPath ?? details.backdrop_path,
             overview: movie.overview ?? details.overview,
+            isAnime: tmdb.looksLikeAnime(details),
           },
         });
         itemsRefreshed += 1;

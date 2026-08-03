@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { importMovie, importTvShow } from "../services/mediaImport";
 import { maybeMarkShowWatched } from "../lib/showStatus";
+import { getShowSchedule } from "../lib/showSchedule";
 
 export const mediaRouter = Router();
 
@@ -14,6 +15,16 @@ const NEW_EPISODE_MARGIN_MS = 60 * 60 * 1000;
 function hasNewUnwatchedEpisodes(item: { addedAt: Date; episodes: { watched: boolean; discoveredAt: Date }[] }) {
   const threshold = item.addedAt.getTime() + NEW_EPISODE_MARGIN_MS;
   return item.episodes.some((e) => !e.watched && e.discoveredAt.getTime() > threshold);
+}
+
+/** Adds the derived fields the UI needs on top of the stored row. */
+function decorate<T extends { mediaType: string; addedAt: Date; episodes: any[] }>(item: T) {
+  const isShow = item.mediaType === "tv";
+  return {
+    ...item,
+    hasNewEpisodes: isShow && hasNewUnwatchedEpisodes(item),
+    ...(isShow ? getShowSchedule(item.episodes) : { nextEpisode: null, seasonFinaleDate: null }),
+  };
 }
 
 mediaRouter.get("/", async (req, res) => {
@@ -29,7 +40,7 @@ mediaRouter.get("/", async (req, res) => {
     orderBy: { updatedAt: "desc" },
   });
 
-  res.json(items.map((item) => ({ ...item, hasNewEpisodes: item.mediaType === "tv" && hasNewUnwatchedEpisodes(item) })));
+  res.json(items.map(decorate));
 });
 
 mediaRouter.get("/:id", async (req, res) => {
@@ -41,7 +52,7 @@ mediaRouter.get("/:id", async (req, res) => {
     include: { episodes: { orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }] } },
   });
   if (!item) return res.status(404).json({ error: "Not found" });
-  res.json(item);
+  res.json(decorate(item));
 });
 
 const addSchema = z.object({

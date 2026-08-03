@@ -26,8 +26,19 @@ export async function importMovie(tmdbId: number) {
       posterPath: details.poster_path,
       backdropPath: details.backdrop_path,
       releaseDate: details.release_date,
+      isAnime: tmdb.looksLikeAnime(details),
     },
   });
+}
+
+/** Fields kept in sync with TMDB on every metadata refresh, not just at import. */
+export function tvStatusFields(details: tmdb.TmdbTvDetails) {
+  return {
+    tmdbStatus: details.status,
+    inProduction: details.in_production,
+    lastAirDate: details.last_air_date,
+    isAnime: tmdb.looksLikeAnime(details),
+  };
 }
 
 export async function importTvShow(tmdbId: number) {
@@ -43,6 +54,7 @@ export async function importTvShow(tmdbId: number) {
       posterPath: details.poster_path,
       backdropPath: details.backdrop_path,
       releaseDate: details.first_air_date,
+      ...tvStatusFields(details),
     },
   });
 

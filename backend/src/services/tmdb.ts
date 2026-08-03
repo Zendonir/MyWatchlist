@@ -70,6 +70,7 @@ export interface TmdbMovieDetails {
   runtime: number | null;
   genres: { id: number; name: string }[];
   vote_average: number;
+  original_language: string;
 }
 
 export function getMovieDetails(id: number) {
@@ -89,6 +90,29 @@ export interface TmdbTvDetails {
   number_of_seasons: number;
   seasons: { season_number: number; episode_count: number; name: string }[];
   external_ids?: { tvdb_id?: number };
+  // "Returning Series" | "Ended" | "Canceled" | "In Production" | "Planned" | "Pilot"
+  status: string;
+  in_production: boolean;
+  last_air_date: string | null;
+  origin_country: string[];
+  original_language: string;
+}
+
+const ANIMATION_GENRE_ID = 16;
+
+/**
+ * TMDB has no "anime" media type, so classify the usual way: animated *and*
+ * Japanese in origin. Live-action Japanese shows and western animation both
+ * correctly fall outside this.
+ */
+export function looksLikeAnime(details: {
+  genres: { id: number }[];
+  original_language: string;
+  origin_country?: string[];
+}) {
+  const isAnimated = details.genres.some((g) => g.id === ANIMATION_GENRE_ID);
+  const isJapanese = details.original_language === "ja" || (details.origin_country ?? []).includes("JP");
+  return isAnimated && isJapanese;
 }
 
 export async function getTvDetails(id: number) {

@@ -33,6 +33,14 @@ model MediaItem {
   posterPath    String?
   backdropPath  String?
   releaseDate   String?
+  // TMDB's own production status for shows ("Returning Series", "Ended",
+  // "Canceled", ...) - i.e. whether the series is finished or continues.
+  tmdbStatus    String?
+  inProduction  Boolean?
+  lastAirDate   String?
+  // Anime is a cross-cutting category rather than a TMDB media type: it's
+  // derived at import time from the Animation genre plus Japanese origin.
+  isAnime       Boolean   @default(false)
   status        String    @default("watchlist") // watchlist | watching | watched | dropped
   userRating    Float?
   notes         String?

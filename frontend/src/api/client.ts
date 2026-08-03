@@ -62,6 +62,13 @@ export interface Episode {
   discoveredAt: string;
 }
 
+export interface NextEpisode {
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string | null;
+  airDate: string | null;
+}
+
 export interface MediaItem {
   id: number;
   mediaType: "movie" | "tv";
@@ -71,6 +78,10 @@ export interface MediaItem {
   posterPath: string | null;
   backdropPath: string | null;
   releaseDate: string | null;
+  tmdbStatus: string | null;
+  inProduction: boolean | null;
+  lastAirDate: string | null;
+  isAnime: boolean;
   status: "watchlist" | "watching" | "watched" | "dropped";
   userRating: number | null;
   notes: string | null;
@@ -78,6 +89,35 @@ export interface MediaItem {
   watchedAt: string | null;
   episodes: Episode[];
   hasNewEpisodes?: boolean;
+  nextEpisode?: NextEpisode | null;
+  seasonFinaleDate?: string | null;
+}
+
+/** Maps TMDB's English production status onto the app's German UI. */
+export function seriesStatusLabel(tmdbStatus: string | null): string | null {
+  switch (tmdbStatus) {
+    case "Returning Series":
+      return "Läuft weiter";
+    case "Ended":
+      return "Abgeschlossen";
+    case "Canceled":
+      return "Abgesetzt";
+    case "In Production":
+      return "In Produktion";
+    case "Planned":
+      return "Geplant";
+    case "Pilot":
+      return "Pilot";
+    default:
+      return tmdbStatus;
+  }
+}
+
+export function formatDate(date: string | null | undefined): string | null {
+  if (!date) return null;
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export interface SearchResult {

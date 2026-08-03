@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, MediaItem, Episode, posterUrl, stillUrl } from "../api/client";
+import { api, MediaItem, Episode, posterUrl, stillUrl, seriesStatusLabel, formatDate } from "../api/client";
 
 const STATUS_OPTIONS = [
   { key: "watchlist", label: "Vormerkliste" },
@@ -58,6 +58,8 @@ export default function MediaDetail() {
 
   const poster = !posterFailed ? posterUrl(item.posterPath, "w500") : null;
   const bySeason = groupBySeason(item.episodes);
+  const nextAirDate = formatDate(item.nextEpisode?.airDate);
+  const finaleDate = formatDate(item.seasonFinaleDate);
 
   return (
     <div className="page detail-page">
@@ -69,7 +71,32 @@ export default function MediaDetail() {
         )}
         <div>
           <h1 className="page__title">{item.title}</h1>
-          <p className="detail-meta">{item.releaseDate?.slice(0, 4)}</p>
+          <p className="detail-meta">
+            {[
+              item.releaseDate?.slice(0, 4),
+              item.isAnime ? "Anime" : item.mediaType === "tv" ? "Serie" : "Film",
+              item.mediaType === "tv" ? seriesStatusLabel(item.tmdbStatus) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {item.mediaType === "tv" && (nextAirDate || finaleDate) && (
+            <p className="detail-air">
+              {nextAirDate && (
+                <>
+                  Nächste Folge
+                  {item.nextEpisode && ` (S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber})`}:{" "}
+                  {nextAirDate}
+                </>
+              )}
+              {finaleDate && finaleDate !== nextAirDate && (
+                <>
+                  <br />
+                  Letzte Folge der Staffel: {finaleDate}
+                </>
+              )}
+            </p>
+          )}
           <p className="detail-overview">{item.overview}</p>
         </div>
       </div>
