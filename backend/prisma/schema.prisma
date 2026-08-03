@@ -8,11 +8,13 @@ generator client {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique
-  passwordHash String
-  role         String   @default("user") // "admin" | "user"
-  createdAt    DateTime @default(now())
+  id            Int                @id @default(autoincrement())
+  username      String             @unique
+  passwordHash  String
+  role          String             @default("user") // "admin" | "user"
+  createdAt     DateTime           @default(now())
+  mediaItems    MediaItem[]
+  watchGroups   WatchGroupMember[]
 }
 
 // Backing store for express-session so sessions survive container restarts.
@@ -24,6 +26,11 @@ model Session {
 
 model MediaItem {
   id            Int       @id @default(autoincrement())
+  // Each user has their own independent list - a show tracked by two
+  // friends is two separate rows (see WatchGroup for the "watching this
+  // together" link between them).
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   mediaType     String // "movie" | "tv"
   tmdbId        Int
   tvdbId        Int?
@@ -51,7 +58,32 @@ model MediaItem {
   updatedAt     DateTime  @updatedAt
   episodes      Episode[]
 
+  @@unique([userId, mediaType, tmdbId])
+}
+
+// A content item (identified by mediaType+tmdbId, independent of any one
+// user's MediaItem row) that a group of users have agreed to watch together.
+// Adding someone auto-imports the content into their own list too - see
+// POST /api/media/:id/buddies.
+model WatchGroup {
+  id        Int                @id @default(autoincrement())
+  mediaType String
+  tmdbId    Int
+  createdAt DateTime           @default(now())
+  members   WatchGroupMember[]
+
   @@unique([mediaType, tmdbId])
+}
+
+model WatchGroupMember {
+  id           Int        @id @default(autoincrement())
+  watchGroupId Int
+  watchGroup   WatchGroup @relation(fields: [watchGroupId], references: [id], onDelete: Cascade)
+  userId       Int
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt      DateTime   @default(now())
+
+  @@unique([watchGroupId, userId])
 }
 
 model Episode {

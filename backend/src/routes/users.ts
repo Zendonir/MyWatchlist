@@ -6,7 +6,10 @@ import { requireAdmin } from "../middleware/auth";
 
 export const usersRouter = Router();
 
-usersRouter.get("/", requireAdmin, async (_req, res) => {
+// Open to any authenticated user, not just admins: picking watch buddies
+// needs to see who else has an account. Username/role/createdAt aren't
+// sensitive within a private, invite-only household app.
+usersRouter.get("/", async (_req, res) => {
   const users = await prisma.user.findMany({
     select: { id: true, username: true, role: true, createdAt: true },
     orderBy: { id: "asc" },

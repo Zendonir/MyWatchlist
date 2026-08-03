@@ -387,9 +387,47 @@ button[type="submit"],
   margin-top: 24px;
 }
 
+.danger-button--small {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
 .form-error {
   color: var(--danger);
   font-size: 0.85rem;
+}
+
+/* User management */
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.user-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-list__badge {
+  margin-left: 8px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.user-form {
+  gap: 10px;
 }
 
 .form-hint {
@@ -466,6 +504,64 @@ button[type="submit"],
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
+}
+
+.watch-buddies {
+  margin-bottom: 20px;
+}
+
+.watch-buddies__title {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.watch-buddies__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.watch-buddies__chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  font-size: 0.85rem;
+}
+
+.watch-buddies__chip button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.watch-buddies__add {
+  display: flex;
+  gap: 8px;
+}
+
+.watch-buddies__add select {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.watch-buddies__add button {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
 }
 
 .episode-list__season-header {

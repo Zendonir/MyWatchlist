@@ -186,20 +186,21 @@ once that the certificate isn't trusted (expected, self-signed) - accept it
 - Keep the container updated (`docker compose pull && docker compose up -d`
   if you push image updates to a registry, or rebuild from a pulled repo).
 
-## Adding more users
+## Multi-user
 
-The account from `APP_USERNAME`/`APP_PASSWORD` is an admin. Additional
-family members can be added by an admin via:
+The account from `APP_USERNAME`/`APP_PASSWORD` is an admin. From **Settings
+→ Nutzer**, an admin can add accounts for friends/family - each person gets
+their own completely independent watchlist (own statuses, own watched
+progress). Kodi sync only ever touches the admin account's list, since Kodi
+is a shared household library, not something each friend has their own copy
+of; everyone else adds things by hand via search.
 
-```bash
-curl -X POST https://your-host/api/users \
-  -H 'Content-Type: application/json' -H 'X-Requested-With: MyWatchlist' \
-  -b cookies.txt \
-  -d '{"username":"partner","password":"a-strong-password","role":"user"}'
-```
-
-(A settings-page UI for this is a possible future improvement; for now it's
-API-only.)
+**Watching together**: on any item's detail page, "Zusammen schauen mit"
+lets you add other users you're watching it with. Adding someone puts that
+movie/show on their list automatically too (if they don't already have it),
+and everyone in the group can see who else is watching along - handy for
+picking up where you left off together. Removing someone from the group
+only detaches that shared context; it doesn't touch their list entry.
 
 ## Installing on iPhone
 

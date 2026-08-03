@@ -132,6 +132,19 @@ async function fetchWatchedEpisodes(dbName: string): Promise<KodiEpisodeRow[]> {
   return rows as KodiEpisodeRow[];
 }
 
+/**
+ * Kodi is a shared household library, not a per-user account - only one
+ * user "owns" it. That's the earliest-created admin account, i.e. whoever
+ * the app was originally set up for; friends added later (who have no Kodi
+ * of their own) are never touched by this sync and only ever add things to
+ * their list manually.
+ */
+async function getKodiOwnerUserId(): Promise<number> {
+  const owner = await prisma.user.findFirst({ where: { role: "admin" }, orderBy: { id: "asc" } });
+  if (!owner) throw new Error("No admin user exists yet to own Kodi-synced items");
+  return owner.id;
+}
+
 export async function testKodiConnection(): Promise<{ dbName: string }> {
   const dbName = await resolveKodiDbName();
   const conn = await getPool().getConnection();
@@ -149,6 +162,7 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
 
   try {
     const dbName = await resolveKodiDbName();
+    const userId = await getKodiOwnerUserId();
 
     const movieRows = await fetchWatchedMovies(dbName);
     for (const row of movieRows) {
@@ -157,11 +171,11 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
       if (!Number.isFinite(tmdbId)) continue;
 
       let mediaItem = await prisma.mediaItem.findUnique({
-        where: { mediaType_tmdbId: { mediaType: "movie", tmdbId } },
+        where: { userId_mediaType_tmdbId: { userId, mediaType: "movie", tmdbId } },
       });
       if (!mediaItem) {
         try {
-          mediaItem = await importMovie(tmdbId);
+          mediaItem = await importMovie(userId, tmdbId);
         } catch {
           continue; // TMDB lookup failed - try again on the next sync
         }
@@ -189,11 +203,11 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
 
     for (const [showTmdbId, rows] of episodesByShow) {
       let mediaItem = await prisma.mediaItem.findUnique({
-        where: { mediaType_tmdbId: { mediaType: "tv", tmdbId: showTmdbId } },
+        where: { userId_mediaType_tmdbId: { userId, mediaType: "tv", tmdbId: showTmdbId } },
       });
       if (!mediaItem) {
         try {
-          mediaItem = await importTvShow(showTmdbId);
+          mediaItem = await importTvShow(userId, showTmdbId);
         } catch {
           continue; // TMDB lookup failed - try again on the next sync
         }

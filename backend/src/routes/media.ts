@@ -28,11 +28,13 @@ function decorate<T extends { mediaType: string; addedAt: Date; episodes: any[] 
 }
 
 mediaRouter.get("/", async (req, res) => {
+  const userId = req.session.userId!;
   const type = typeof req.query.type === "string" ? req.query.type : undefined;
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
 
   const items = await prisma.mediaItem.findMany({
     where: {
+      userId,
       ...(type ? { mediaType: type } : {}),
       ...(status ? { status } : {}),
     },
@@ -47,8 +49,8 @@ mediaRouter.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
 
-  const item = await prisma.mediaItem.findUnique({
-    where: { id },
+  const item = await prisma.mediaItem.findFirst({
+    where: { id, userId: req.session.userId! },
     include: { episodes: { orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }] } },
   });
   if (!item) return res.status(404).json({ error: "Not found" });
@@ -65,20 +67,21 @@ mediaRouter.post("/", async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
+  const userId = req.session.userId!;
   const { tmdbId, mediaType } = parsed.data;
 
   const existing = await prisma.mediaItem.findUnique({
-    where: { mediaType_tmdbId: { mediaType, tmdbId } },
+    where: { userId_mediaType_tmdbId: { userId, mediaType, tmdbId } },
   });
   if (existing) return res.status(409).json({ error: "Already in watchlist", item: existing });
 
   try {
     if (mediaType === "movie") {
-      const item = await importMovie(tmdbId);
+      const item = await importMovie(userId, tmdbId);
       return res.status(201).json(item);
     }
 
-    const item = await importTvShow(tmdbId);
+    const item = await importTvShow(userId, tmdbId);
     const full = await prisma.mediaItem.findUnique({
       where: { id: item.id },
       include: { episodes: { orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }] } },
@@ -109,18 +112,20 @@ mediaRouter.patch("/:id", async (req, res) => {
   if (parsed.data.watched === true) data.watchedAt = new Date();
   if (parsed.data.watched === false) data.watchedAt = null;
 
-  try {
-    const item = await prisma.mediaItem.update({ where: { id }, data });
-    res.json(item);
-  } catch {
-    res.status(404).json({ error: "Not found" });
-  }
+  const { count } = await prisma.mediaItem.updateMany({
+    where: { id, userId: req.session.userId! },
+    data,
+  });
+  if (count === 0) return res.status(404).json({ error: "Not found" });
+
+  const item = await prisma.mediaItem.findUnique({ where: { id } });
+  res.json(item);
 });
 
 mediaRouter.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
-  await prisma.mediaItem.delete({ where: { id } }).catch(() => null);
+  await prisma.mediaItem.deleteMany({ where: { id, userId: req.session.userId! } });
   res.json({ ok: true });
 });
 
@@ -136,7 +141,9 @@ mediaRouter.patch("/:id/episodes/:episodeId", async (req, res) => {
   const parsed = episodeUpdateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
 
-  const episode = await prisma.episode.findFirst({ where: { id: episodeId, mediaItemId } });
+  const episode = await prisma.episode.findFirst({
+    where: { id: episodeId, mediaItemId, mediaItem: { userId: req.session.userId! } },
+  });
   if (!episode) return res.status(404).json({ error: "Not found" });
 
   const updated = await prisma.episode.update({
@@ -162,7 +169,7 @@ mediaRouter.patch("/:id/seasons/:seasonNumber", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
 
   const { count } = await prisma.episode.updateMany({
-    where: { mediaItemId, seasonNumber },
+    where: { mediaItemId, seasonNumber, mediaItem: { userId: req.session.userId! } },
     data: {
       watched: parsed.data.watched,
       watchedAt: parsed.data.watched ? new Date() : null,
@@ -177,4 +184,93 @@ mediaRouter.patch("/:id/seasons/:seasonNumber", async (req, res) => {
     orderBy: { episodeNumber: "asc" },
   });
   res.json(episodes);
+});
+
+const buddiesSchema = z.object({ userIds: z.array(z.number().int().positive()).min(1) });
+
+mediaRouter.get("/:id/buddies", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const item = await prisma.mediaItem.findFirst({ where: { id, userId: req.session.userId! } });
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const group = await prisma.watchGroup.findUnique({
+    where: { mediaType_tmdbId: { mediaType: item.mediaType, tmdbId: item.tmdbId } },
+    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+  });
+  res.json(group?.members.map((m) => m.user) ?? []);
+});
+
+mediaRouter.post("/:id/buddies", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const parsed = buddiesSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+
+  const userId = req.session.userId!;
+  const item = await prisma.mediaItem.findFirst({ where: { id, userId } });
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const buddyIds = [...new Set(parsed.data.userIds)].filter((uid) => uid !== userId);
+  const buddies = await prisma.user.findMany({ where: { id: { in: buddyIds } } });
+
+  const group = await prisma.watchGroup.upsert({
+    where: { mediaType_tmdbId: { mediaType: item.mediaType, tmdbId: item.tmdbId } },
+    update: {},
+    create: { mediaType: item.mediaType, tmdbId: item.tmdbId },
+  });
+
+  await prisma.watchGroupMember.upsert({
+    where: { watchGroupId_userId: { watchGroupId: group.id, userId } },
+    update: {},
+    create: { watchGroupId: group.id, userId },
+  });
+
+  for (const buddy of buddies) {
+    await prisma.watchGroupMember.upsert({
+      where: { watchGroupId_userId: { watchGroupId: group.id, userId: buddy.id } },
+      update: {},
+      create: { watchGroupId: group.id, userId: buddy.id },
+    });
+
+    const existing = await prisma.mediaItem.findUnique({
+      where: { userId_mediaType_tmdbId: { userId: buddy.id, mediaType: item.mediaType, tmdbId: item.tmdbId } },
+    });
+    if (!existing) {
+      try {
+        if (item.mediaType === "movie") await importMovie(buddy.id, item.tmdbId);
+        else await importTvShow(buddy.id, item.tmdbId);
+      } catch {
+        // TMDB lookup failed - the buddy just won't get it auto-added and
+        // can add it manually; the group membership above still stands.
+      }
+    }
+  }
+
+  const updated = await prisma.watchGroup.findUnique({
+    where: { id: group.id },
+    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+  });
+  res.json(updated?.members.map((m) => m.user) ?? []);
+});
+
+mediaRouter.delete("/:id/buddies/:userId", async (req, res) => {
+  const id = Number(req.params.id);
+  const buddyUserId = Number(req.params.userId);
+  if (!Number.isInteger(id) || !Number.isInteger(buddyUserId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+
+  const item = await prisma.mediaItem.findFirst({ where: { id, userId: req.session.userId! } });
+  if (!item) return res.status(404).json({ error: "Not found" });
+
+  const group = await prisma.watchGroup.findUnique({
+    where: { mediaType_tmdbId: { mediaType: item.mediaType, tmdbId: item.tmdbId } },
+  });
+  if (group) {
+    await prisma.watchGroupMember.deleteMany({ where: { watchGroupId: group.id, userId: buddyUserId } });
+  }
+  res.json({ ok: true });
 });

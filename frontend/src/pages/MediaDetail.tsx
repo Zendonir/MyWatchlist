@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, MediaItem, Episode, posterUrl, stillUrl, seriesStatusLabel, formatDate } from "../api/client";
+import { api, MediaItem, Episode, User, posterUrl, stillUrl, seriesStatusLabel, formatDate } from "../api/client";
+import { useAuth } from "../api/AuthContext";
 
 const STATUS_OPTIONS = [
   { key: "watchlist", label: "Vormerkliste" },
@@ -113,6 +114,8 @@ export default function MediaDetail() {
         ))}
       </div>
 
+      <WatchBuddies mediaItemId={item.id} />
+
       {item.mediaType === "tv" && item.episodes.length > 0 && (
         <div className="episode-list">
           {Object.entries(bySeason).map(([season, episodes]) => {
@@ -143,6 +146,78 @@ export default function MediaDetail() {
       <button className="danger-button" onClick={remove}>
         Aus Watchlist entfernen
       </button>
+    </div>
+  );
+}
+
+function WatchBuddies({ mediaItemId }: { mediaItemId: number }) {
+  const { user } = useAuth();
+  const [buddies, setBuddies] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selected, setSelected] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    load();
+    api.get<User[]>("/users").then(setAllUsers);
+  }, [mediaItemId]);
+
+  function load() {
+    api.get<User[]>(`/media/${mediaItemId}/buddies`).then(setBuddies);
+  }
+
+  const others = buddies.filter((b) => b.id !== user?.id);
+  const addableUsers = allUsers.filter((u) => u.id !== user?.id && !buddies.some((b) => b.id === u.id));
+
+  async function addBuddy() {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await api.post(`/media/${mediaItemId}/buddies`, { userIds: [Number(selected)] });
+      setSelected("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBuddy(userId: number) {
+    await api.delete(`/media/${mediaItemId}/buddies/${userId}`);
+    load();
+  }
+
+  return (
+    <div className="watch-buddies">
+      <h2 className="watch-buddies__title">Zusammen schauen mit</h2>
+      {others.length === 0 && <p className="form-hint">Noch niemand - füge unten jemanden hinzu.</p>}
+      {others.length > 0 && (
+        <div className="watch-buddies__chips">
+          {others.map((b) => (
+            <span key={b.id} className="watch-buddies__chip">
+              {b.username}
+              <button aria-label={`${b.username} entfernen`} onClick={() => removeBuddy(b.id)}>
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {addableUsers.length > 0 && (
+        <div className="watch-buddies__add">
+          <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+            <option value="">Person auswählen…</option>
+            {addableUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.username}
+              </option>
+            ))}
+          </select>
+          <button onClick={addBuddy} disabled={!selected || busy}>
+            Hinzufügen
+          </button>
+        </div>
+      )}
     </div>
   );
 }

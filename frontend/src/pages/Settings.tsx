@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, ApiError } from "../api/client";
+import { FormEvent, useEffect, useState } from "react";
+import { api, ApiError, User } from "../api/client";
 import { useAuth } from "../api/AuthContext";
 
 interface SyncLogEntry {
@@ -25,12 +25,50 @@ export default function Settings() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
+  const [users, setUsers] = useState<User[]>([]);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [userError, setUserError] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+
   useEffect(() => {
     loadStatus();
-  }, []);
+    if (user?.role === "admin") loadUsers();
+  }, [user?.role]);
 
   function loadStatus() {
     api.get<SyncStatus>("/sync/status").then(setStatus);
+  }
+
+  function loadUsers() {
+    api.get<User[]>("/users").then(setUsers);
+  }
+
+  async function createUser(e: FormEvent) {
+    e.preventDefault();
+    setUserError(null);
+    setCreatingUser(true);
+    try {
+      await api.post("/users", { username: newUsername, password: newPassword });
+      setNewUsername("");
+      setNewPassword("");
+      loadUsers();
+    } catch (err) {
+      setUserError(err instanceof ApiError ? err.message : "Nutzer konnte nicht angelegt werden");
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function deleteUser(id: number, username: string) {
+    if (!confirm(`Nutzer "${username}" wirklich löschen? Seine komplette Watchlist wird dabei unwiderruflich mitgelöscht.`))
+      return;
+    try {
+      await api.delete(`/users/${id}`);
+      loadUsers();
+    } catch (err) {
+      setUserError(err instanceof ApiError ? err.message : "Nutzer konnte nicht gelöscht werden");
+    }
   }
 
   async function triggerSync() {
@@ -123,6 +161,58 @@ export default function Settings() {
           <p>TMDB ist nicht konfiguriert.</p>
         )}
       </section>
+
+      {user?.role === "admin" && (
+        <section className="settings-section">
+          <h2>Nutzer</h2>
+          <p className="form-hint">
+            Jeder Nutzer verwaltet seine eigene Watchlist unabhängig. Kodi-Sync betrifft nur dein eigenes Konto.
+          </p>
+
+          <div className="user-list">
+            {users.map((u) => (
+              <div key={u.id} className="user-list__row">
+                <span>
+                  {u.username}
+                  {u.role === "admin" && <span className="user-list__badge">Admin</span>}
+                </span>
+                {u.id !== user.id && (
+                  <button className="danger-button danger-button--small" onClick={() => deleteUser(u.id, u.username)}>
+                    Entfernen
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <form className="user-form" onSubmit={createUser}>
+            <label>
+              Nutzername
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                minLength={3}
+                required
+              />
+            </label>
+            <label>
+              Passwort
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </label>
+            {userError && <div className="form-error">{userError}</div>}
+            <button type="submit" disabled={creatingUser}>
+              {creatingUser ? "Lege an…" : "Nutzer hinzufügen"}
+            </button>
+          </form>
+        </section>
+      )}
     </div>
   );
 }

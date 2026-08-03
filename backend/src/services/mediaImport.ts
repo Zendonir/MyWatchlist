@@ -14,10 +14,11 @@ export function episodeCreateData(mediaItemId: number, ep: tmdb.TmdbEpisode) {
   };
 }
 
-export async function importMovie(tmdbId: number) {
+export async function importMovie(userId: number, tmdbId: number) {
   const details = await tmdb.getMovieDetails(tmdbId);
   return prisma.mediaItem.create({
     data: {
+      userId,
       mediaType: "movie",
       tmdbId: details.id,
       title: details.title,
@@ -41,10 +42,11 @@ export function tvStatusFields(details: tmdb.TmdbTvDetails) {
   };
 }
 
-export async function importTvShow(tmdbId: number) {
+export async function importTvShow(userId: number, tmdbId: number) {
   const details = await tmdb.getTvDetails(tmdbId);
   const item = await prisma.mediaItem.create({
     data: {
+      userId,
       mediaType: "tv",
       tmdbId: details.id,
       tvdbId: details.external_ids?.tvdb_id ?? undefined,
