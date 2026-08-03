@@ -19,7 +19,7 @@ export default function MediaCard({ id, title, posterUrl, subtitle, badge, showN
     <div className="media-card">
       <div className="media-card__poster">
         {showImage ? (
-          <img src={posterUrl} alt="" loading="lazy" onError={() => setImageFailed(true)} />
+          <img src={posterUrl} alt="" loading="lazy" crossOrigin="anonymous" onError={() => setImageFailed(true)} />
         ) : (
           <div className="media-card__poster--placeholder">🎬</div>
         )}

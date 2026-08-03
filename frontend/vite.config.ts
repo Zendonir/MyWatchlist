@@ -33,8 +33,15 @@ export default defineConfig({
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/,
             handler: "CacheFirst",
             options: {
-              cacheName: "tmdb-images",
+              // "v2" so upgrading to this version starts with a clean cache -
+              // the previous config had no cacheableResponse restriction, so
+              // any image that failed to load while <img> tags lacked
+              // crossorigin (making the response "opaque", status always
+              // reported as 0) got cached as if it had succeeded, and would
+              // keep being served as broken forever after.
+              cacheName: "tmdb-images-v2",
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],

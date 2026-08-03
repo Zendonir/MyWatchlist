@@ -63,7 +63,7 @@ export default function MediaDetail() {
     <div className="page detail-page">
       <div className="detail-header">
         {poster ? (
-          <img className="detail-poster" src={poster} alt="" onError={() => setPosterFailed(true)} />
+          <img className="detail-poster" src={poster} alt="" crossOrigin="anonymous" onError={() => setPosterFailed(true)} />
         ) : (
           <div className="detail-poster detail-poster--placeholder">🎬</div>
         )}
@@ -133,7 +133,7 @@ function EpisodeRow({ episode, onToggle }: { episode: Episode; onToggle: (id: nu
       />
       <div className="episode-row__still">
         {still ? (
-          <img src={still} alt="" loading="lazy" onError={() => setStillFailed(true)} />
+          <img src={still} alt="" loading="lazy" crossOrigin="anonymous" onError={() => setStillFailed(true)} />
         ) : (
           <div className="episode-row__still--placeholder">📺</div>
         )}
