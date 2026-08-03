@@ -113,8 +113,14 @@ async function fetchWatchedEpisodes(dbName: string): Promise<KodiEpisodeRow[]> {
   // interpolation cannot introduce injectable SQL.
   const seasonCol = env.KODI_EPISODE_SEASON_COLUMN;
   const episodeCol = env.KODI_EPISODE_NUMBER_COLUMN;
+  // Kodi's episode_view exposes season/episode via its generic cXX content
+  // columns, which are TEXT in the schema regardless of what they hold - cast
+  // them to integers here so mysql2 returns real numbers, not "1"-style
+  // strings (which Prisma's typed where-clauses reject).
   const [rows] = await getPool().query(
-    `SELECT e.idEpisode AS idEpisode, ev.${seasonCol} AS season, ev.${episodeCol} AS episode,
+    `SELECT e.idEpisode AS idEpisode,
+            CAST(ev.${seasonCol} AS UNSIGNED) AS season,
+            CAST(ev.${episodeCol} AS UNSIGNED) AS episode,
             f.playCount AS playCount, u.value AS showTmdbId
      FROM \`${dbName}\`.episode e
      JOIN \`${dbName}\`.episode_view ev ON ev.idEpisode = e.idEpisode
@@ -194,12 +200,16 @@ export async function runKodiSync(): Promise<{ itemsUpdated: number; dbName: str
       }
 
       for (const row of rows) {
+        const seasonNumber = Number(row.season);
+        const episodeNumber = Number(row.episode);
+        if (!Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber)) continue;
+
         const episode = await prisma.episode.findUnique({
           where: {
             mediaItemId_seasonNumber_episodeNumber: {
               mediaItemId: mediaItem.id,
-              seasonNumber: row.season,
-              episodeNumber: row.episode,
+              seasonNumber,
+              episodeNumber,
             },
           },
         });

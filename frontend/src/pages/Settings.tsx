@@ -83,6 +83,9 @@ export default function Settings() {
                 ? `${new Date(status.lastSync.startedAt).toLocaleString("de-DE")} - ${status.lastSync.status}`
                 : "noch nie"}
             </p>
+            {status.lastSync?.status === "error" && status.lastSync.message && (
+              <p className="form-error">{status.lastSync.message}</p>
+            )}
             {user?.role === "admin" && (
               <button onClick={triggerSync} disabled={syncing}>
                 {syncing ? "Synchronisiere…" : "Jetzt synchronisieren"}
@@ -105,6 +108,9 @@ export default function Settings() {
                 ? `${new Date(status.lastMetadataRefresh.startedAt).toLocaleString("de-DE")} - ${status.lastMetadataRefresh.status}`
                 : "noch nie"}
             </p>
+            {status.lastMetadataRefresh?.status === "error" && status.lastMetadataRefresh.message && (
+              <p className="form-error">{status.lastMetadataRefresh.message}</p>
+            )}
             <p className="form-hint">Prüft täglich automatisch auf neu erschienene Folgen und fehlende Poster/Infos.</p>
             {user?.role === "admin" && (
               <button onClick={triggerMetadataRefresh} disabled={refreshing}>
