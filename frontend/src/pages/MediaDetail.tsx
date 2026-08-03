@@ -29,6 +29,13 @@ export default function MediaDetail() {
       .finally(() => setLoading(false));
   }
 
+  // Re-fetches in place without touching `loading` - toggling that flag
+  // would collapse the whole page down to the "Lädt…" placeholder and back,
+  // which loses scroll position and jumps back to the top on every click.
+  function refresh() {
+    api.get<MediaItem>(`/media/${id}`).then(setItem);
+  }
+
   async function setStatus(status: string) {
     if (!item) return;
     const updated = await api.patch<MediaItem>(`/media/${item.id}`, { status });
@@ -38,13 +45,13 @@ export default function MediaDetail() {
   async function toggleEpisode(episodeId: number, watched: boolean) {
     if (!item) return;
     await api.patch(`/media/${item.id}/episodes/${episodeId}`, { watched });
-    load();
+    refresh();
   }
 
   async function toggleSeason(seasonNumber: number, watched: boolean) {
     if (!item) return;
     await api.patch(`/media/${item.id}/seasons/${seasonNumber}`, { watched });
-    load();
+    refresh();
   }
 
   async function remove() {
@@ -71,7 +78,14 @@ export default function MediaDetail() {
           <div className="detail-poster detail-poster--placeholder">🎬</div>
         )}
         <div>
-          <h1 className="page__title">{item.title}</h1>
+          <h1 className="page__title">
+            {item.title}
+            {item.kodiId != null && (
+              <span className="detail-kodi-badge" title="Aus Kodi synchronisiert">
+                Kodi
+              </span>
+            )}
+          </h1>
           <p className="detail-meta">
             {[
               item.releaseDate?.slice(0, 4),

@@ -87,6 +87,7 @@ export interface MediaItem {
   notes: string | null;
   watched: boolean;
   watchedAt: string | null;
+  kodiId: number | null;
   episodes: Episode[];
   hasNewEpisodes?: boolean;
   nextEpisode?: NextEpisode | null;

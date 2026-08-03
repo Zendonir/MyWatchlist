@@ -8,10 +8,20 @@ interface Props {
   subtitle?: string;
   badge?: string;
   showNewBadge?: boolean;
+  showKodiBadge?: boolean;
   onClick?: () => void;
 }
 
-export default function MediaCard({ id, title, posterUrl, subtitle, badge, showNewBadge, onClick }: Props) {
+export default function MediaCard({
+  id,
+  title,
+  posterUrl,
+  subtitle,
+  badge,
+  showNewBadge,
+  showKodiBadge,
+  onClick,
+}: Props) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = posterUrl && !imageFailed;
 
@@ -25,6 +35,11 @@ export default function MediaCard({ id, title, posterUrl, subtitle, badge, showN
         )}
         {badge && <span className="media-card__badge">{badge}</span>}
         {showNewBadge && <span className="media-card__new-badge">Neu</span>}
+        {showKodiBadge && (
+          <span className="media-card__kodi-badge" title="Aus Kodi synchronisiert">
+            Kodi
+          </span>
+        )}
       </div>
       <div className="media-card__title">{title}</div>
       {subtitle && <div className="media-card__subtitle">{subtitle}</div>}

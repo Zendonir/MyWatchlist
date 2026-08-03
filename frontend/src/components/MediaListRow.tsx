@@ -30,6 +30,11 @@ export default function MediaListRow({ item }: { item: MediaItem }) {
         <div className="list-row__title">
           {item.title}
           {item.hasNewEpisodes && <span className="list-row__new">Neu</span>}
+          {item.kodiId != null && (
+            <span className="list-row__kodi" title="Aus Kodi synchronisiert">
+              Kodi
+            </span>
+          )}
         </div>
 
         <div className="list-row__meta">

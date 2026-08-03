@@ -146,6 +146,7 @@ export default function Dashboard() {
                 subtitle={subtitle}
                 badge={item.isAnime ? "Anime" : item.mediaType === "tv" ? "Serie" : "Film"}
                 showNewBadge={item.hasNewEpisodes}
+                showKodiBadge={item.kodiId != null}
               />
             );
           })}

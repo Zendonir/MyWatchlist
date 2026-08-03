@@ -74,6 +74,19 @@ button {
   margin: 0 0 12px;
 }
 
+.detail-kodi-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 10px;
+  background: rgba(30, 144, 200, 0.85);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
 .page__header {
   display: flex;
   align-items: center;
@@ -166,6 +179,17 @@ button {
   color: var(--accent-contrast);
   font-size: 0.65rem;
   font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.list-row__kodi {
+  background: rgba(30, 144, 200, 0.85);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   padding: 1px 6px;
   border-radius: 6px;
   flex-shrink: 0;
@@ -309,6 +333,19 @@ button {
   color: var(--accent-contrast);
   font-size: 0.65rem;
   font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.media-card__kodi-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(30, 144, 200, 0.85);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   padding: 2px 6px;
   border-radius: 6px;
 }
@@ -457,12 +494,15 @@ button[type="submit"],
 /* Detail page */
 .detail-header {
   display: flex;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 16px;
 }
 
 .detail-poster {
   width: 120px;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
   border-radius: 10px;
   flex-shrink: 0;
 }
