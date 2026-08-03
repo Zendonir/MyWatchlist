@@ -15,6 +15,7 @@ import { usersRouter } from "./routes/users";
 import { mediaRouter } from "./routes/media";
 import { searchRouter } from "./routes/search";
 import { syncRouter } from "./routes/sync";
+import { imagesRouter } from "./routes/images";
 
 const app = express();
 
@@ -73,6 +74,20 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Artwork gets a much higher ceiling than the rest of the API and is mounted
+// ahead of it: opening a long-running show can legitimately request hundreds
+// of episode stills in one go, which would otherwise trip the API limiter.
+// It also skips requireApiHeader, since <img> tags can't set custom headers
+// (and GETs are exempt from that check anyway).
+const imageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 3000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/images", imageLimiter, requireAuth, imagesRouter);
 
 app.use("/api", apiLimiter, requireApiHeader);
 app.use("/api/auth", authRouter);

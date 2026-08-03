@@ -89,12 +89,15 @@ export interface SearchResult {
   releaseDate: string | null;
 }
 
+// Artwork is served through our own backend rather than hitting
+// image.tmdb.org from the page - see backend/src/routes/images.ts for why
+// (cross-origin images break inside the installed iOS PWA).
 export function posterUrl(path: string | null, size: "w200" | "w342" | "w500" = "w342") {
   if (!path) return null;
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+  return `/api/images/${size}${path}`;
 }
 
 export function stillUrl(path: string | null, size: "w185" | "w300" = "w300") {
   if (!path) return null;
-  return `https://image.tmdb.org/t/p/${size}${path}`;
+  return `/api/images/${size}${path}`;
 }

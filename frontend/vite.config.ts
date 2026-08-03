@@ -26,26 +26,12 @@ export default defineConfig({
       },
       workbox: {
         // API responses are session/auth-sensitive - never cache them, only
-        // the static app shell.
+        // the static app shell. Artwork is served same-origin under /api/images
+        // (see backend/src/routes/images.ts) and is deliberately left to the
+        // browser's normal HTTP cache: routing cross-origin images through the
+        // service worker made them opaque responses, which blew through iOS's
+        // PWA storage quota and broke image loading on iPhone entirely.
         navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/image\.tmdb\.org\/.*/,
-            // StaleWhileRevalidate instead of CacheFirst: always re-fetches
-            // in the background and updates the cache, so a previously
-            // failed/opaque response (TMDB's CDN doesn't reliably support
-            // anonymous CORS, so <img> tags intentionally don't set
-            // crossorigin - meaning these responses stay opaque and can't be
-            // filtered by status) self-heals within one extra load instead
-            // of being stuck for the full cache lifetime.
-            handler: "StaleWhileRevalidate",
-            options: {
-              // "v3": bust the caches from earlier, more aggressive configs.
-              cacheName: "tmdb-images-v3",
-              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 3 },
-            },
-          },
-        ],
       },
     }),
   ],

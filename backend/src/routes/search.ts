@@ -31,7 +31,9 @@ searchRouter.get("/", async (req, res) => {
         mediaType: r.media_type ?? (type === "movie" ? "movie" : "tv"),
         title: r.title ?? r.name ?? "Unknown",
         overview: r.overview,
-        posterUrl: tmdb.tmdbImageUrl(r.poster_path, "w200"),
+        // Same-origin proxy path rather than image.tmdb.org directly - see
+        // routes/images.ts.
+        posterUrl: r.poster_path ? `/api/images/w200${r.poster_path}` : null,
         releaseDate: r.release_date ?? r.first_air_date ?? null,
       }));
 
