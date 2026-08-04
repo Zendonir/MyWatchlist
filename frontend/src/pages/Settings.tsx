@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, ApiError, User } from "../api/client";
 import { useAuth } from "../api/AuthContext";
 import ChangePasswordForm from "../components/ChangePasswordForm";
@@ -14,18 +15,29 @@ interface SyncLogEntry {
 interface SyncStatus {
   kodiConfigured: boolean;
   tmdbConfigured: boolean;
+  googleOAuthConfigured: boolean;
   emailConfigured: boolean;
+  connectedGoogleEmail: string | null;
   lastSync: SyncLogEntry | null;
   lastMetadataRefresh: SyncLogEntry | null;
 }
 
 export default function Settings() {
   const { user, logout, setUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
+  const [googleStatusMessage, setGoogleStatusMessage] = useState<string | null>(() => {
+    if (searchParams.get("google") === "connected") return "Google-Konto erfolgreich verbunden.";
+    if (searchParams.get("google") === "error") {
+      return `Verbindung fehlgeschlagen: ${searchParams.get("message") ?? "unbekannter Fehler"}`;
+    }
+    return null;
+  });
 
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -54,6 +66,15 @@ export default function Settings() {
   }, [user?.role]);
 
   useEffect(() => {
+    if (searchParams.has("google")) {
+      setSearchParams({}, { replace: true });
+    }
+    // Only ever needs to run once, to strip the OAuth redirect's query
+    // params - re-running on every searchParams change would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
     setNotifyEmail(user?.notifyEmail ?? true);
@@ -80,6 +101,22 @@ export default function Settings() {
       setProfileError(err instanceof ApiError ? err.message : "Konnte nicht gespeichert werden");
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function disconnectGoogle() {
+    if (!confirm("Verbindung zum Google-Konto trennen? Passwort vergessen und Benachrichtigungsmails funktionieren dann nicht mehr, bis erneut verbunden wird.")) {
+      return;
+    }
+    setDisconnectingGoogle(true);
+    try {
+      await api.post("/admin/google/disconnect");
+      setGoogleStatusMessage("Verbindung getrennt.");
+      loadStatus();
+    } catch (err) {
+      setGoogleStatusMessage(err instanceof ApiError ? err.message : "Trennen fehlgeschlagen");
+    } finally {
+      setDisconnectingGoogle(false);
     }
   }
 
@@ -265,11 +302,17 @@ export default function Settings() {
       {user?.role === "admin" && (
         <section className="settings-section">
           <h2>E-Mail-Versand</h2>
-          {status?.emailConfigured ? (
+          {!status?.googleOAuthConfigured ? (
+            <p>
+              Google OAuth ist nicht konfiguriert (siehe README / Umgebungsvariablen GOOGLE_CLIENT_ID /
+              GOOGLE_CLIENT_SECRET / APP_URL).
+            </p>
+          ) : status?.emailConfigured ? (
             <>
               <p className="form-hint">
-                Sendet an deine eigene hinterlegte Adresse ({user.email}). "Beispiel-Digest" zeigt genau das Format
-                der täglichen Benachrichtigungsmail mit Beispieldaten.
+                Verbunden als <strong>{status.connectedGoogleEmail}</strong>. Sendet Testmails an deine eigene
+                hinterlegte Adresse ({user.email}). "Beispiel-Digest" zeigt genau das Format der täglichen
+                Benachrichtigungsmail mit Beispieldaten.
               </p>
               <div className="user-list__actions">
                 <button onClick={() => sendTestEmail("simple")} disabled={testingEmail}>
@@ -278,12 +321,24 @@ export default function Settings() {
                 <button onClick={() => sendTestEmail("digest")} disabled={testingEmail}>
                   {testingEmail ? "Sende…" : "Beispiel-Digest senden"}
                 </button>
+                <button className="danger-button--small" onClick={disconnectGoogle} disabled={disconnectingGoogle}>
+                  {disconnectingGoogle ? "Trenne…" : "Verbindung trennen"}
+                </button>
               </div>
               {testEmailMessage && <p className="form-hint">{testEmailMessage}</p>}
             </>
           ) : (
-            <p>E-Mail ist nicht konfiguriert (siehe README / Umgebungsvariablen SMTP_*).</p>
+            <>
+              <p className="form-hint">
+                Verbinde ein Google-Konto, um "Passwort vergessen" und tägliche Benachrichtigungsmails (neue Folgen /
+                abgeschlossene Serien) zu aktivieren.
+              </p>
+              <a className="button-link" href="/api/admin/google/connect">
+                Mit Google verbinden
+              </a>
+            </>
           )}
+          {googleStatusMessage && <p className="form-hint">{googleStatusMessage}</p>}
         </section>
       )}
 

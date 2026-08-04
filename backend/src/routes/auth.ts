@@ -5,8 +5,8 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { prisma } from "../db";
 import { requireAuth } from "../middleware/auth";
-import { env, passwordResetConfigured } from "../env";
-import { sendMail } from "../services/email";
+import { env } from "../env";
+import { sendMail, isEmailConnected } from "../services/googleMail";
 
 export const authRouter = Router();
 
@@ -172,7 +172,9 @@ authRouter.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     message: "Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde eine E-Mail mit weiteren Schritten verschickt.",
   };
 
-  if (!passwordResetConfigured) return res.json(genericResponse);
+  // The reset link needs an absolute APP_URL, and there needs to be a
+  // connected Google account to actually send it.
+  if (!env.APP_URL || !(await isEmailConnected())) return res.json(genericResponse);
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
 

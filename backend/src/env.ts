@@ -45,14 +45,14 @@ const schema = z.object({
     .default("c13"),
 
   // --- Email (optional): password reset + new-episode/show-completed digest ---
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().default(587),
-  SMTP_SECURE: z.coerce.boolean().default(false),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM: z.string().optional(),
-  // Public base URL used to build links in emails (password reset). No
-  // trailing slash, e.g. https://watchlist.example.com or https://192.168.1.2:3000
+  // These two are a one-time OAuth app registration (Google Cloud Console -
+  // see README), not a mail account. Which Google account actually sends
+  // mail is connected interactively from Settings, not via env vars.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  // Public base URL used to build links in emails (password reset) and as
+  // the OAuth redirect URI. No trailing slash, e.g.
+  // https://watchlist.example.com or https://192.168.1.2:3000
   APP_URL: z.string().optional(),
 });
 
@@ -70,7 +70,7 @@ export const kodiConfigured = Boolean(env.KODI_DB_HOST && env.KODI_DB_USER && en
 
 export const tmdbConfigured = Boolean(env.TMDB_API_KEY || env.TMDB_ACCESS_TOKEN);
 export const tvdbConfigured = Boolean(env.TVDB_API_KEY);
-export const emailConfigured = Boolean(env.SMTP_HOST && env.SMTP_FROM);
-// The forgot-password email needs an absolute link back into the app, so it
-// additionally requires APP_URL - notification digests don't strictly need it.
-export const passwordResetConfigured = emailConfigured && Boolean(env.APP_URL);
+// Whether a Google OAuth client is registered at all - i.e. whether the
+// "Mit Google verbinden" button can work. Whether an account is actually
+// connected is separate DB state (see services/googleMail.ts).
+export const googleOAuthConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.APP_URL);

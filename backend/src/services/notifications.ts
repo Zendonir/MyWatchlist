@@ -1,6 +1,5 @@
 import { prisma } from "../db";
-import { emailConfigured } from "../env";
-import { sendMail } from "./email";
+import { sendMail, isEmailConnected } from "./googleMail";
 
 interface CompletedEntry {
   mediaItemId: number;
@@ -83,7 +82,7 @@ export class RefreshDigest {
   }
 
   async send() {
-    if (!emailConfigured) return;
+    if (!(await isEmailConnected())) return;
 
     const userIds = new Set([...this.newEpisodes.keys(), ...this.completed.keys()]);
     for (const userId of userIds) {

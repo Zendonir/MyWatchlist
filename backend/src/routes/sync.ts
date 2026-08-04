@@ -3,19 +3,28 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { runKodiSync, testKodiConnection } from "../services/kodiSync";
 import { runMetadataRefresh } from "../services/metadataRefresh";
-import { sendMail } from "../services/email";
+import { sendMail, getConnection } from "../services/googleMail";
 import { buildDigestEmail } from "../services/notifications";
 import { requireAdmin } from "../middleware/auth";
-import { kodiConfigured, tmdbConfigured, emailConfigured } from "../env";
+import { kodiConfigured, tmdbConfigured, googleOAuthConfigured } from "../env";
 
 export const syncRouter = Router();
 
 syncRouter.get("/status", async (_req, res) => {
-  const [lastKodiSync, lastMetadataRefresh] = await Promise.all([
+  const [lastKodiSync, lastMetadataRefresh, connection] = await Promise.all([
     prisma.syncLog.findFirst({ where: { source: "kodi" }, orderBy: { startedAt: "desc" } }),
     prisma.syncLog.findFirst({ where: { source: "metadata" }, orderBy: { startedAt: "desc" } }),
+    getConnection(),
   ]);
-  res.json({ kodiConfigured, tmdbConfigured, emailConfigured, lastSync: lastKodiSync, lastMetadataRefresh });
+  res.json({
+    kodiConfigured,
+    tmdbConfigured,
+    googleOAuthConfigured,
+    emailConfigured: connection !== null,
+    connectedGoogleEmail: connection?.email ?? null,
+    lastSync: lastKodiSync,
+    lastMetadataRefresh,
+  });
 });
 
 syncRouter.post("/kodi", requireAdmin, async (_req, res) => {
@@ -59,12 +68,12 @@ const testEmailSchema = z.object({
   kind: z.enum(["simple", "digest"]).default("simple"),
 });
 
-// Lets an admin verify SMTP actually works, and preview exactly what the
-// daily digest email looks like, without waiting for a real metadata run to
-// produce one.
+// Lets an admin verify the connected Google account actually works, and
+// preview exactly what the daily digest email looks like, without waiting
+// for a real metadata run to produce one.
 syncRouter.post("/test-email", requireAdmin, async (req, res) => {
-  if (!emailConfigured) {
-    return res.status(503).json({ error: "E-Mail ist nicht konfiguriert" });
+  if (!(await getConnection())) {
+    return res.status(503).json({ error: "Kein Google-Konto verbunden" });
   }
   const parsed = testEmailSchema.safeParse(req.body);
   if (!parsed.success) {

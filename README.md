@@ -56,8 +56,8 @@ To build the image yourself instead of using the published one, follow the
    cp .env.example .env
    ```
    At minimum set `SESSION_SECRET`, `APP_EMAIL`, `APP_PASSWORD`, and a
-   `TMDB_API_KEY` (see below). Kodi, TVDB and email (`SMTP_*`) settings are
-   optional.
+   `TMDB_API_KEY` (see below). Kodi, TVDB and email (`GOOGLE_CLIENT_ID`)
+   settings are optional.
 3. Build and start:
    ```bash
    docker compose up -d --build
@@ -213,22 +213,53 @@ else - the admin-picked one is one-time only.
 ## Email (optional)
 
 Every account has an email address (it's the login), but actually *sending*
-mail is opt-in - set the `SMTP_*` and `APP_URL` variables (see
-`.env.example`) to enable two things:
+mail is opt-in and works by connecting a Google account via OAuth - no SMTP
+server or App-Passwort needed. It enables two things:
 
 - **Passwort vergessen**: a "Passwort vergessen?" link on the login page
-  sends a one-hour, single-use reset link. Without `APP_URL` set, this stays
-  disabled (a self-hosted app has no way to guess its own public URL) but
-  users can still be helped out via **Settings → Nutzer → Passwort
-  zurücksetzen** (admin-only, no email required).
+  sends a one-hour, single-use reset link. Without a connected account, this
+  stays disabled, but users can still be helped out via **Settings → Nutzer
+  → Passwort zurücksetzen** (admin-only, no email required).
 - **Digest emails**: once a day, alongside the metadata refresh, anyone with
   "Per E-Mail benachrichtigen" enabled (on by default, toggle it under
   Settings) gets a summary of new episodes discovered and shows that just
   finished - only for content on their own list.
 
-Once `SMTP_*` is set, an admin can verify it works and preview the digest
-format from **Settings → E-Mail-Versand** ("Test-E-Mail senden" /
-"Beispiel-Digest senden").
+**Setup (one-time, per deployment):**
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a
+   project (or reuse one) → **APIs & Services → OAuth consent screen**.
+   Choose **External**, fill in the required fields, and add the Google
+   account you'll actually connect as a **test user**.
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**,
+   application type **Web application**. Under **Authorized redirect URIs**
+   add `<APP_URL>/api/admin/google/callback` (e.g.
+   `https://watchlist.example.com/api/admin/google/callback`, or
+   `https://192.168.1.2:3000/api/admin/google/callback` for the LAN-HTTPS
+   variant).
+3. Copy the generated **Client ID** and **Client secret** into
+   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, and set `APP_URL` to your
+   app's public URL (same value used in step 2, without the path). Restart
+   the container.
+4. In the app: **Settings → E-Mail-Versand → Mit Google verbinden**, sign
+   in and grant access. That's it - no password or App-Passwort ever
+   touches this app; only a Google-issued token does, which any admin can
+   revoke any time from **Settings** ("Verbindung trennen") or from
+   [Google's own permissions page](https://myaccount.google.com/permissions).
+
+**Heads up on Google's "Testing" publishing status:** while your OAuth
+consent screen is in Testing (the default, and the only option without
+Google's app-verification process), Google expires the connection after 7
+days and it needs reconnecting from Settings. Moving the consent screen to
+"In production" avoids that - for the `gmail.send` scope this app uses,
+Google generally allows that without requiring full verification for a
+small personal app, but shows an "unverified app" warning during connect
+(click "Advanced" → "Go to (app name)" to proceed, same as the Testing
+flow).
+
+An admin can verify the connection works and preview the digest format
+from **Settings → E-Mail-Versand** ("Test-E-Mail senden" / "Beispiel-Digest
+senden").
 
 ## Installing on iPhone
 

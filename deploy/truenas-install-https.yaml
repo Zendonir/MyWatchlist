@@ -37,7 +37,7 @@ services:
       # Required - creates the first admin account on initial startup only.
       # APP_EMAIL doubles as your login - it doesn't need to be a real,
       # working address (only "forgot password"/notifications need that,
-      # both optional - see SMTP_* below).
+      # both optional - see GOOGLE_CLIENT_ID below).
       APP_EMAIL: "REPLACE_ME_EMAIL"
       APP_NAME: "Admin"
       APP_PASSWORD: "REPLACE_ME_STRONG_PASSWORD"
@@ -60,16 +60,15 @@ services:
       KODI_DB_NAME_PREFIX: "MyVideos"
       KODI_SYNC_CRON: "0 3 * * *"
 
-      # Optional - enables "Passwort vergessen" + daily email digests (new
-      # episodes / completed shows). Leave SMTP_HOST empty to disable.
-      SMTP_HOST: ""
-      SMTP_PORT: "587"
-      SMTP_SECURE: "false"
-      SMTP_USER: ""
-      SMTP_PASSWORD: ""
-      SMTP_FROM: ""
-      # Needed in addition to the SMTP_* vars above for "Passwort vergessen"
-      # to work - same LAN_IP as below, e.g. https://192.168.1.2:3000
+      # Optional - a ONE-TIME OAuth app registration (Google Cloud Console,
+      # see README "Email (optional)"), NOT a mail account. Once these two
+      # are set, connect the actual Gmail account interactively from
+      # Settings -> E-Mail-Versand -> "Mit Google verbinden" - no
+      # App-Passwort needed. Leave empty to disable email entirely.
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      # Required for the OAuth redirect and for "Passwort vergessen" links -
+      # same LAN_IP as below, e.g. https://192.168.1.2:3000
       APP_URL: ""
     volumes:
       - mywatchlist_data:/app/data
