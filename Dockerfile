@@ -27,6 +27,10 @@ FROM node:20-alpine AS runtime
 RUN apk add --no-cache tini openssl
 WORKDIR /app
 ENV NODE_ENV=production
+# Set from the release workflow's build-arg (the git tag) - "dev" for local/
+# unreleased builds. Shown in the web UI under Settings.
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 
 COPY --from=backend-build /app/backend/package*.json ./
 COPY --from=backend-build /app/backend/node_modules ./node_modules

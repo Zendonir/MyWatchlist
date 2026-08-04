@@ -12,6 +12,7 @@ interface SyncLogEntry {
 }
 
 interface SyncStatus {
+  version: string;
   kodiConfigured: boolean;
   tmdbConfigured: boolean;
   emailConfigured: boolean;
@@ -503,6 +504,8 @@ export default function Settings() {
           </form>
         </section>
       )}
+
+      {status?.version && <p className="app-version">MyWatchlist v{status.version}</p>}
     </div>
   );
 }

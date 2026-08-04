@@ -6,7 +6,7 @@ import { runMetadataRefresh } from "../services/metadataRefresh";
 import { sendMail, getSettings } from "../services/smtp";
 import { buildDigestEmail } from "../services/notifications";
 import { requireAdmin } from "../middleware/auth";
-import { kodiConfigured, tmdbConfigured } from "../env";
+import { kodiConfigured, tmdbConfigured, env } from "../env";
 
 export const syncRouter = Router();
 
@@ -17,6 +17,7 @@ syncRouter.get("/status", async (_req, res) => {
     getSettings(),
   ]);
   res.json({
+    version: env.APP_VERSION,
     kodiConfigured,
     tmdbConfigured,
     emailConfigured: smtp !== null,

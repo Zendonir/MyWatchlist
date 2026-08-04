@@ -3,6 +3,10 @@ import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.string().default("production"),
   PORT: z.coerce.number().default(3000),
+  // Baked into the image at build time from the release tag (see
+  // Dockerfile / .github/workflows/release.yml) - shown in Settings so an
+  // admin can tell what's actually running. "dev" for local/unreleased builds.
+  APP_VERSION: z.string().default("dev"),
   DATABASE_URL: z.string().min(1),
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
   TRUST_PROXY: z.coerce.number().default(1),

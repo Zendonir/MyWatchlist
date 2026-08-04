@@ -490,6 +490,13 @@ button[type="submit"],
   margin-top: 16px;
 }
 
+.app-version {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 24px 0 8px;
+}
+
 .user-list__badge {
   margin-left: 8px;
   font-size: 0.7rem;

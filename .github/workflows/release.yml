@@ -54,6 +54,8 @@ jobs:
           tags: |
             ghcr.io/zendonir/mywatchlist:${{ steps.version.outputs.version }}
             ghcr.io/zendonir/mywatchlist:latest
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
