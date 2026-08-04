@@ -42,6 +42,17 @@ const schema = z.object({
     .string()
     .regex(/^c[0-9]{1,2}$/, "must look like a column name, e.g. c13")
     .default("c13"),
+
+  // --- Email (optional): password reset + new-episode/show-completed digest ---
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  // Public base URL used to build links in emails (password reset). No
+  // trailing slash, e.g. https://watchlist.example.com or https://192.168.1.2:3000
+  APP_URL: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -58,3 +69,7 @@ export const kodiConfigured = Boolean(env.KODI_DB_HOST && env.KODI_DB_USER && en
 
 export const tmdbConfigured = Boolean(env.TMDB_API_KEY || env.TMDB_ACCESS_TOKEN);
 export const tvdbConfigured = Boolean(env.TVDB_API_KEY);
+export const emailConfigured = Boolean(env.SMTP_HOST && env.SMTP_FROM);
+// The forgot-password email needs an absolute link back into the app, so it
+// additionally requires APP_URL - notification digests don't strictly need it.
+export const passwordResetConfigured = emailConfigured && Boolean(env.APP_URL);

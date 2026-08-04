@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth, ApiError } from "../api/AuthContext";
 
 export default function Login() {
@@ -55,6 +55,9 @@ export default function Login() {
             {submitting ? "Anmelden…" : "Anmelden"}
           </button>
         </form>
+        <p className="form-hint">
+          <Link to="/forgot-password">Passwort vergessen?</Link>
+        </p>
       </div>
     </div>
   );

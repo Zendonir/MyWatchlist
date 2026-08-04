@@ -8,13 +8,35 @@ generator client {
 }
 
 model User {
-  id            Int                @id @default(autoincrement())
-  username      String             @unique
-  passwordHash  String
-  role          String             @default("user") // "admin" | "user"
-  createdAt     DateTime           @default(now())
-  mediaItems    MediaItem[]
-  watchGroups   WatchGroupMember[]
+  id                 Int                  @id @default(autoincrement())
+  username           String               @unique
+  passwordHash       String
+  role               String               @default("user") // "admin" | "user"
+  // Set whenever an admin picks a user's initial/reset password on their
+  // behalf - forces a self-service change on next login rather than letting
+  // them keep using a password someone else chose.
+  mustChangePassword Boolean              @default(false)
+  email              String?              @unique
+  // Opt-out for the "new episodes / show completed" digest email - only
+  // takes effect once an email address is actually set.
+  notifyEmail        Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  mediaItems         MediaItem[]
+  watchGroups        WatchGroupMember[]
+  passwordResets     PasswordResetToken[]
+}
+
+// Single-use, time-limited tokens for the "forgot password" email flow.
+// The raw token is only ever sent to the user's inbox - we store a SHA-256
+// hash of it so a database read alone can't be used to reset an account.
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 // Backing store for express-session so sessions survive container restarts.

@@ -398,6 +398,7 @@ label {
 
 input[type="text"],
 input[type="password"],
+input[type="email"],
 input[type="search"] {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -446,11 +447,43 @@ button[type="submit"],
 
 .user-list__row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.user-list__row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.user-list__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.user-list__reset-form {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.user-list__reset-form input {
+  flex: 1;
+}
+
+.settings-checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.settings-checkbox-row input {
+  width: 18px;
+  height: 18px;
 }
 
 .user-list__badge {

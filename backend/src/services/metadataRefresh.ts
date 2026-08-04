@@ -2,6 +2,9 @@ import { prisma } from "../db";
 import { tmdbConfigured } from "../env";
 import * as tmdb from "./tmdb";
 import { episodeCreateData, tvStatusFields } from "./mediaImport";
+import { RefreshDigest } from "./notifications";
+
+const COMPLETED_STATUSES = new Set(["Ended", "Canceled"]);
 
 /**
  * Refreshes tracked shows against TMDB: adds episodes for seasons that
@@ -17,6 +20,7 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
   const log = await prisma.syncLog.create({ data: { source: "metadata", status: "running" } });
   let episodesAdded = 0;
   let itemsRefreshed = 0;
+  const digest = new RefreshDigest();
 
   try {
     const shows = await prisma.mediaItem.findMany({
@@ -28,6 +32,7 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
       try {
         const details = await tmdb.getTvDetails(show.tmdbId);
         const known = new Set(show.episodes.map((e) => `${e.seasonNumber}.${e.episodeNumber}`));
+        let newEpisodeCount = 0;
 
         for (const season of details.seasons) {
           if (season.season_number === 0) continue; // skip "specials"
@@ -41,11 +46,21 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
             data: newEpisodes.map((ep) => episodeCreateData(show.id, ep)),
           });
           episodesAdded += newEpisodes.length;
+          newEpisodeCount += newEpisodes.length;
+        }
+        if (newEpisodeCount > 0) {
+          digest.addNewEpisodes(show.userId, show.id, show.title, newEpisodeCount);
         }
 
         // Production status is refreshed unconditionally, not just when
         // missing: a show moves from "Returning Series" to "Ended" over time,
         // and a stale value is worse than no value here.
+        const wasCompleted = COMPLETED_STATUSES.has(show.tmdbStatus ?? "");
+        const nowCompleted = COMPLETED_STATUSES.has(details.status ?? "");
+        if (!wasCompleted && nowCompleted) {
+          digest.addCompleted(show.userId, show.id, show.title);
+        }
+
         await prisma.mediaItem.update({
           where: { id: show.id },
           data: {
@@ -61,6 +76,8 @@ export async function runMetadataRefresh(): Promise<{ episodesAdded: number; ite
         continue; // TMDB lookup failed for this show - try again next time
       }
     }
+
+    await digest.send();
 
     // All movies, not just ones missing artwork: isAnime defaults to false, so
     // there's no way to tell "not anime" from "never classified", and items

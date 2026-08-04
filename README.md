@@ -202,6 +202,27 @@ and everyone in the group can see who else is watching along - handy for
 picking up where you left off together. Removing someone from the group
 only detaches that shared context; it doesn't touch their list entry.
 
+**Passwords**: anyone can change their own password any time under
+**Settings**. A user an admin creates (or resets the password for) has to
+set their own password on their very next login before they can do anything
+else - the admin-picked one is one-time only.
+
+## Email (optional)
+
+Set the `SMTP_*` and `APP_URL` variables (see `.env.example`) to enable two
+things - both are entirely optional, and each user opts into email
+individually by adding an address under **Settings**:
+
+- **Passwort vergessen**: a "Passwort vergessen?" link on the login page
+  sends a one-hour, single-use reset link. Without `APP_URL` set, this stays
+  disabled (a self-hosted app has no way to guess its own public URL) but
+  users can still be helped out via **Settings → Nutzer → Passwort
+  zurücksetzen** (admin-only, no email required).
+- **Digest emails**: once a day, alongside the metadata refresh, anyone with
+  an email address set and "Per E-Mail benachrichtigen" enabled gets a
+  summary of new episodes discovered and shows that just finished - only for
+  content on their own list. Turn it off per-account in Settings.
+
 ## Installing on iPhone
 
 Open the site in Safari, tap the Share icon, then **"Zum Home-Bildschirm"**
