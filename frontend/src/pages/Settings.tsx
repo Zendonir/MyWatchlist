@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { api, ApiError, User } from "../api/client";
 import { useAuth } from "../api/AuthContext";
 import ChangePasswordForm from "../components/ChangePasswordForm";
@@ -15,29 +14,28 @@ interface SyncLogEntry {
 interface SyncStatus {
   kodiConfigured: boolean;
   tmdbConfigured: boolean;
-  googleOAuthConfigured: boolean;
   emailConfigured: boolean;
-  connectedGoogleEmail: string | null;
   lastSync: SyncLogEntry | null;
   lastMetadataRefresh: SyncLogEntry | null;
 }
 
+interface SmtpStatus {
+  configured: boolean;
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string | null;
+  from?: string;
+  passwordSet?: boolean;
+}
+
 export default function Settings() {
   const { user, logout, setUser } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-  const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
-  const [googleStatusMessage, setGoogleStatusMessage] = useState<string | null>(() => {
-    if (searchParams.get("google") === "connected") return "Google-Konto erfolgreich verbunden.";
-    if (searchParams.get("google") === "error") {
-      return `Verbindung fehlgeschlagen: ${searchParams.get("message") ?? "unbekannter Fehler"}`;
-    }
-    return null;
-  });
 
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -45,6 +43,18 @@ export default function Settings() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+
+  const [smtp, setSmtp] = useState<SmtpStatus | null>(null);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [smtpError, setSmtpError] = useState<string | null>(null);
+  const [smtpSaved, setSmtpSaved] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [removingSmtp, setRemovingSmtp] = useState(false);
 
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailMessage, setTestEmailMessage] = useState<string | null>(null);
@@ -62,43 +72,11 @@ export default function Settings() {
 
   useEffect(() => {
     loadStatus();
-    if (user?.role === "admin") loadUsers();
+    if (user?.role === "admin") {
+      loadUsers();
+      loadSmtp();
+    }
   }, [user?.role]);
-
-  useEffect(() => {
-    if (searchParams.has("google")) {
-      setSearchParams({}, { replace: true });
-    }
-    // Only ever needs to run once, to strip the OAuth redirect's query
-    // params - re-running on every searchParams change would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // The popup's /oauth-callback page posts the result here instead of the
-  // popup itself navigating this window - see connectGoogle below.
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.source !== "mywatchlist-google-oauth") return;
-      if (event.data.ok) {
-        setGoogleStatusMessage("Google-Konto erfolgreich verbunden.");
-        loadStatus();
-      } else {
-        setGoogleStatusMessage(`Verbindung fehlgeschlagen: ${event.data.message ?? "unbekannter Fehler"}`);
-      }
-    }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  function connectGoogle() {
-    const popup = window.open("/api/admin/google/connect", "google-connect", "width=500,height=650");
-    // Popup blockers etc. can return null - fall back to a normal top-level
-    // navigation, which /oauth-callback also handles fine (no window.opener).
-    if (!popup) {
-      window.location.href = "/api/admin/google/connect";
-    }
-  }
 
   useEffect(() => {
     setName(user?.name ?? "");
@@ -112,6 +90,18 @@ export default function Settings() {
 
   function loadUsers() {
     api.get<User[]>("/users").then(setUsers);
+  }
+
+  function loadSmtp() {
+    api.get<SmtpStatus>("/admin/smtp").then((s) => {
+      setSmtp(s);
+      setSmtpHost(s.host ?? "");
+      setSmtpPort(String(s.port ?? "587"));
+      setSmtpSecure(s.secure ?? false);
+      setSmtpUser(s.user ?? "");
+      setSmtpFrom(s.from ?? "");
+      setSmtpPassword("");
+    });
   }
 
   async function saveProfile(e: FormEvent) {
@@ -130,19 +120,49 @@ export default function Settings() {
     }
   }
 
-  async function disconnectGoogle() {
-    if (!confirm("Verbindung zum Google-Konto trennen? Passwort vergessen und Benachrichtigungsmails funktionieren dann nicht mehr, bis erneut verbunden wird.")) {
+  async function saveSmtp(e: FormEvent) {
+    e.preventDefault();
+    setSmtpError(null);
+    setSmtpSaved(false);
+    setSavingSmtp(true);
+    try {
+      await api.put("/admin/smtp", {
+        host: smtpHost,
+        port: Number(smtpPort),
+        secure: smtpSecure,
+        user: smtpUser || undefined,
+        password: smtpPassword || undefined,
+        from: smtpFrom,
+      });
+      setSmtpSaved(true);
+      loadStatus();
+      loadSmtp();
+    } catch (err) {
+      setSmtpError(err instanceof ApiError ? [err.message, err.detail].filter(Boolean).join(": ") : "Konnte nicht gespeichert werden");
+    } finally {
+      setSavingSmtp(false);
+    }
+  }
+
+  async function removeSmtp() {
+    if (!confirm("SMTP-Konfiguration entfernen? \"Passwort vergessen\" und Benachrichtigungsmails funktionieren dann nicht mehr.")) {
       return;
     }
-    setDisconnectingGoogle(true);
+    setRemovingSmtp(true);
     try {
-      await api.post("/admin/google/disconnect");
-      setGoogleStatusMessage("Verbindung getrennt.");
+      await api.delete("/admin/smtp");
+      setSmtpHost("");
+      setSmtpPort("587");
+      setSmtpSecure(false);
+      setSmtpUser("");
+      setSmtpPassword("");
+      setSmtpFrom("");
       loadStatus();
+      loadSmtp();
     } catch (err) {
-      setGoogleStatusMessage(err instanceof ApiError ? err.message : "Trennen fehlgeschlagen");
+      setSmtpError(err instanceof ApiError ? err.message : "Entfernen fehlgeschlagen");
     } finally {
-      setDisconnectingGoogle(false);
+      setRemovingSmtp(false);
     }
   }
 
@@ -327,42 +347,79 @@ export default function Settings() {
 
       {user?.role === "admin" && (
         <section className="settings-section">
-          <h2>E-Mail-Versand</h2>
-          {!status?.googleOAuthConfigured ? (
-            <p>
-              Google OAuth ist nicht konfiguriert (siehe README / Umgebungsvariablen GOOGLE_CLIENT_ID /
-              GOOGLE_CLIENT_SECRET / APP_URL).
-            </p>
-          ) : status?.emailConfigured ? (
+          <h2>E-Mail-Versand (SMTP)</h2>
+          <p className="form-hint">
+            Wird für "Passwort vergessen" und tägliche Benachrichtigungsmails (neue Folgen / abgeschlossene Serien)
+            verwendet. Bei Gmail: Host <code>smtp.gmail.com</code>, Port <code>587</code>, als Passwort ein{" "}
+            <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
+              App-Passwort
+            </a>{" "}
+            verwenden (erfordert 2-Faktor-Authentifizierung), nicht das normale Google-Passwort.
+          </p>
+          <form className="user-form" onSubmit={saveSmtp}>
+            <label>
+              SMTP-Host
+              <input type="text" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" required />
+            </label>
+            <label>
+              Port
+              <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} min={1} max={65535} required />
+            </label>
+            <label className="settings-checkbox-row">
+              <input type="checkbox" checked={smtpSecure} onChange={(e) => setSmtpSecure(e.target.checked)} />
+              Implizites TLS (meist Port 465) - sonst STARTTLS auf Port 587
+            </label>
+            <label>
+              Benutzername
+              <input type="text" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} />
+            </label>
+            <label>
+              Passwort {smtp?.passwordSet && <span className="form-hint">(gesetzt - leer lassen, um es zu behalten)</span>}
+              <input
+                type="password"
+                value={smtpPassword}
+                onChange={(e) => setSmtpPassword(e.target.value)}
+                placeholder={smtp?.passwordSet ? "unverändert lassen" : ""}
+              />
+            </label>
+            <label>
+              Absenderadresse
+              <input
+                type="text"
+                value={smtpFrom}
+                onChange={(e) => setSmtpFrom(e.target.value)}
+                placeholder="MyWatchlist <you@example.com>"
+                required
+              />
+            </label>
+            {smtpError && <div className="form-error">{smtpError}</div>}
+            {smtpSaved && <div className="form-hint">Gespeichert.</div>}
+            <div className="user-list__actions">
+              <button type="submit" disabled={savingSmtp}>
+                {savingSmtp ? "Speichere…" : "Speichern"}
+              </button>
+              {smtp?.configured && (
+                <button type="button" className="danger-button--small" onClick={removeSmtp} disabled={removingSmtp}>
+                  {removingSmtp ? "Entferne…" : "Entfernen"}
+                </button>
+              )}
+            </div>
+          </form>
+
+          {status?.emailConfigured && (
             <>
-              <p className="form-hint">
-                Verbunden als <strong>{status.connectedGoogleEmail}</strong>. Sendet Testmails an deine eigene
-                hinterlegte Adresse ({user.email}). "Beispiel-Digest" zeigt genau das Format der täglichen
-                Benachrichtigungsmail mit Beispieldaten.
-              </p>
-              <div className="user-list__actions">
+              <div className="user-list__actions settings-mt">
                 <button onClick={() => sendTestEmail("simple")} disabled={testingEmail}>
                   {testingEmail ? "Sende…" : "Test-E-Mail senden"}
                 </button>
                 <button onClick={() => sendTestEmail("digest")} disabled={testingEmail}>
                   {testingEmail ? "Sende…" : "Beispiel-Digest senden"}
                 </button>
-                <button className="danger-button--small" onClick={disconnectGoogle} disabled={disconnectingGoogle}>
-                  {disconnectingGoogle ? "Trenne…" : "Verbindung trennen"}
-                </button>
               </div>
+              <p className="form-hint">Sendet an deine eigene hinterlegte Adresse ({user.email}).</p>
               {testEmailMessage && <p className="form-hint">{testEmailMessage}</p>}
             </>
-          ) : (
-            <>
-              <p className="form-hint">
-                Verbinde ein Google-Konto, um "Passwort vergessen" und tägliche Benachrichtigungsmails (neue Folgen /
-                abgeschlossene Serien) zu aktivieren.
-              </p>
-              <button onClick={connectGoogle}>Mit Google verbinden</button>
-            </>
           )}
-          {googleStatusMessage && <p className="form-hint">{googleStatusMessage}</p>}
         </section>
       )}
 

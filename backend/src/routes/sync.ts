@@ -3,25 +3,23 @@ import { z } from "zod";
 import { prisma } from "../db";
 import { runKodiSync, testKodiConnection } from "../services/kodiSync";
 import { runMetadataRefresh } from "../services/metadataRefresh";
-import { sendMail, getConnection } from "../services/googleMail";
+import { sendMail, getSettings } from "../services/smtp";
 import { buildDigestEmail } from "../services/notifications";
 import { requireAdmin } from "../middleware/auth";
-import { kodiConfigured, tmdbConfigured, googleOAuthConfigured } from "../env";
+import { kodiConfigured, tmdbConfigured } from "../env";
 
 export const syncRouter = Router();
 
 syncRouter.get("/status", async (_req, res) => {
-  const [lastKodiSync, lastMetadataRefresh, connection] = await Promise.all([
+  const [lastKodiSync, lastMetadataRefresh, smtp] = await Promise.all([
     prisma.syncLog.findFirst({ where: { source: "kodi" }, orderBy: { startedAt: "desc" } }),
     prisma.syncLog.findFirst({ where: { source: "metadata" }, orderBy: { startedAt: "desc" } }),
-    getConnection(),
+    getSettings(),
   ]);
   res.json({
     kodiConfigured,
     tmdbConfigured,
-    googleOAuthConfigured,
-    emailConfigured: connection !== null,
-    connectedGoogleEmail: connection?.email ?? null,
+    emailConfigured: smtp !== null,
     lastSync: lastKodiSync,
     lastMetadataRefresh,
   });
@@ -68,12 +66,12 @@ const testEmailSchema = z.object({
   kind: z.enum(["simple", "digest"]).default("simple"),
 });
 
-// Lets an admin verify the connected Google account actually works, and
-// preview exactly what the daily digest email looks like, without waiting
-// for a real metadata run to produce one.
+// Lets an admin verify SMTP actually works, and preview exactly what the
+// daily digest email looks like, without waiting for a real metadata run to
+// produce one.
 syncRouter.post("/test-email", requireAdmin, async (req, res) => {
-  if (!(await getConnection())) {
-    return res.status(503).json({ error: "Kein Google-Konto verbunden" });
+  if (!(await getSettings())) {
+    return res.status(503).json({ error: "SMTP ist nicht konfiguriert" });
   }
   const parsed = testEmailSchema.safeParse(req.body);
   if (!parsed.success) {

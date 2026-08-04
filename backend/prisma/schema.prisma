@@ -143,17 +143,18 @@ model SyncLog {
   message      String?
 }
 
-// Singleton (always id=1) holding the one Google account connected via
-// OAuth for sending mail (password resets + digest emails). Replaces
-// per-deployment SMTP_* config - connecting is done interactively from
-// Settings, not by editing env vars. The refresh token is the only thing
-// that lets the app mint new send-access tokens, so it's never returned
-// from any API response.
-model EmailConnection {
-  id                Int      @id @default(1)
-  email             String
-  refreshToken      String
-  scope             String
-  connectedAt       DateTime @default(now())
-  connectedByUserId Int
+// Singleton (always id=1) holding SMTP settings for sending mail (password
+// resets + digest emails), entered from Settings rather than env vars/YAML.
+// `password` is never returned from any API response - the settings GET
+// endpoint only reports whether one is set.
+model SmtpSettings {
+  id              Int      @id @default(1)
+  host            String
+  port            Int
+  secure          Boolean  @default(false)
+  user            String?
+  password        String?
+  from            String
+  updatedAt       DateTime @default(now()) @updatedAt
+  updatedByUserId Int
 }

@@ -56,8 +56,8 @@ To build the image yourself instead of using the published one, follow the
    cp .env.example .env
    ```
    At minimum set `SESSION_SECRET`, `APP_EMAIL`, `APP_PASSWORD`, and a
-   `TMDB_API_KEY` (see below). Kodi, TVDB and email (`GOOGLE_CLIENT_ID`)
-   settings are optional.
+   `TMDB_API_KEY` (see below). Kodi, TVDB and email (configured later from
+   Settings) are optional.
 3. Build and start:
    ```bash
    docker compose up -d --build
@@ -213,11 +213,12 @@ else - the admin-picked one is one-time only.
 ## Email (optional)
 
 Every account has an email address (it's the login), but actually *sending*
-mail is opt-in and works by connecting a Google account via OAuth - no SMTP
-server or App-Passwort needed. It enables two things:
+mail is opt-in and configured entirely from **Settings → E-Mail-Versand
+(SMTP)** as an admin - not via env vars or the deploy YAML. It enables two
+things:
 
 - **Passwort vergessen**: a "Passwort vergessen?" link on the login page
-  sends a one-hour, single-use reset link. Without a connected account, this
+  sends a one-hour, single-use reset link. Without SMTP configured, this
   stays disabled, but users can still be helped out via **Settings → Nutzer
   → Passwort zurücksetzen** (admin-only, no email required).
 - **Digest emails**: once a day, alongside the metadata refresh, anyone with
@@ -225,41 +226,21 @@ server or App-Passwort needed. It enables two things:
   Settings) gets a summary of new episodes discovered and shows that just
   finished - only for content on their own list.
 
-**Setup (one-time, per deployment):**
+**Setup:** in **Settings → E-Mail-Versand (SMTP)**, fill in host, port,
+user, password and a "From" address, then save. For Gmail:
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create a
-   project (or reuse one) → **APIs & Services → OAuth consent screen**.
-   Choose **External**, fill in the required fields, and add the Google
-   account you'll actually connect as a **test user**.
-2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**,
-   application type **Web application**. Under **Authorized redirect URIs**
-   add `<APP_URL>/api/admin/google/callback` (e.g.
-   `https://watchlist.example.com/api/admin/google/callback`, or
-   `https://192.168.1.2:3000/api/admin/google/callback` for the LAN-HTTPS
-   variant).
-3. Copy the generated **Client ID** and **Client secret** into
-   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, and set `APP_URL` to your
-   app's public URL (same value used in step 2, without the path). Restart
-   the container.
-4. In the app: **Settings → E-Mail-Versand → Mit Google verbinden**, sign
-   in and grant access. That's it - no password or App-Passwort ever
-   touches this app; only a Google-issued token does, which any admin can
-   revoke any time from **Settings** ("Verbindung trennen") or from
-   [Google's own permissions page](https://myaccount.google.com/permissions).
+- Host `smtp.gmail.com`, port `587`, "Implizites TLS" unchecked (STARTTLS)
+- Password: a Google **App-Passwort**, not your normal Google password -
+  requires 2-Faktor-Authentifizierung on the account, then generate one at
+  [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 
-**Heads up on Google's "Testing" publishing status:** while your OAuth
-consent screen is in Testing (the default, and the only option without
-Google's app-verification process), Google expires the connection after 7
-days and it needs reconnecting from Settings. Moving the consent screen to
-"In production" avoids that - for the `gmail.send` scope this app uses,
-Google generally allows that without requiring full verification for a
-small personal app, but shows an "unverified app" warning during connect
-(click "Advanced" → "Go to (app name)" to proceed, same as the Testing
-flow).
+Any other SMTP provider (a self-hosted relay, a transactional-email service,
+etc.) works the same way - just its host/port/credentials instead. `APP_URL`
+(env var, see `.env.example`) still needs to be set so password-reset links
+point back at your app.
 
-An admin can verify the connection works and preview the digest format
-from **Settings → E-Mail-Versand** ("Test-E-Mail senden" / "Beispiel-Digest
-senden").
+An admin can verify the configuration works and preview the digest format
+from the same section ("Test-E-Mail senden" / "Beispiel-Digest senden").
 
 ## Installing on iPhone
 

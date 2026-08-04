@@ -16,7 +16,7 @@ import { mediaRouter } from "./routes/media";
 import { searchRouter } from "./routes/search";
 import { syncRouter } from "./routes/sync";
 import { imagesRouter } from "./routes/images";
-import { googleAuthRouter } from "./routes/googleAuth";
+import { smtpRouter } from "./routes/smtp";
 
 const app = express();
 
@@ -96,7 +96,7 @@ app.use("/api/users", requireAuth, usersRouter);
 app.use("/api/media", requireAuth, mediaRouter);
 app.use("/api/search", requireAuth, searchRouter);
 app.use("/api/sync", requireAuth, syncRouter);
-app.use("/api/admin/google", requireAuth, googleAuthRouter);
+app.use("/api/admin/smtp", requireAuth, smtpRouter);
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 

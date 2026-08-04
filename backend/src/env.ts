@@ -44,15 +44,10 @@ const schema = z.object({
     .regex(/^c[0-9]{1,2}$/, "must look like a column name, e.g. c13")
     .default("c13"),
 
-  // --- Email (optional): password reset + new-episode/show-completed digest ---
-  // These two are a one-time OAuth app registration (Google Cloud Console -
-  // see README), not a mail account. Which Google account actually sends
-  // mail is connected interactively from Settings, not via env vars.
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  // Public base URL used to build links in emails (password reset) and as
-  // the OAuth redirect URI. No trailing slash, e.g.
-  // https://watchlist.example.com or https://192.168.1.2:3000
+  // Public base URL used to build links in password-reset emails. SMTP
+  // itself is configured from Settings, not env vars - see routes/smtp.ts.
+  // No trailing slash, e.g. https://watchlist.example.com or
+  // https://192.168.1.2:3000
   APP_URL: z.string().optional(),
 });
 
@@ -70,7 +65,3 @@ export const kodiConfigured = Boolean(env.KODI_DB_HOST && env.KODI_DB_USER && en
 
 export const tmdbConfigured = Boolean(env.TMDB_API_KEY || env.TMDB_ACCESS_TOKEN);
 export const tvdbConfigured = Boolean(env.TVDB_API_KEY);
-// Whether a Google OAuth client is registered at all - i.e. whether the
-// "Mit Google verbinden" button can work. Whether an account is actually
-// connected is separate DB state (see services/googleMail.ts).
-export const googleOAuthConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.APP_URL);

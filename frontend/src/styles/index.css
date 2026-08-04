@@ -486,6 +486,10 @@ button[type="submit"],
   height: 18px;
 }
 
+.settings-mt {
+  margin-top: 16px;
+}
+
 .user-list__badge {
   margin-left: 8px;
   font-size: 0.7rem;
