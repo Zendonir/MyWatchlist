@@ -90,7 +90,9 @@ export default function Settings() {
       const result = await api.post<{ sentTo: string }>("/sync/test-email", { kind });
       setTestEmailMessage(`Gesendet an ${result.sentTo}.`);
     } catch (err) {
-      setTestEmailMessage(err instanceof ApiError ? err.message : "Versand fehlgeschlagen");
+      setTestEmailMessage(
+        err instanceof ApiError ? [err.message, err.detail].filter(Boolean).join(": ") : "Versand fehlgeschlagen"
+      );
     } finally {
       setTestingEmail(false);
     }

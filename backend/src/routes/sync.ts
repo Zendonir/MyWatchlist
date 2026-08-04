@@ -100,6 +100,7 @@ syncRouter.post("/test-email", requireAdmin, async (req, res) => {
     await sendMail({ to, ...content });
     res.json({ ok: true, sentTo: to });
   } catch (err: any) {
+    console.error("Test email failed:", err);
     res.status(502).json({ error: "Versand fehlgeschlagen", detail: String(err?.message ?? err) });
   }
 });

@@ -1,8 +1,10 @@
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  detail?: string;
+  constructor(status: number, message: string, detail?: string) {
     super(message);
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -19,13 +21,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!resp.ok) {
     let message = resp.statusText;
+    let detail: string | undefined;
     try {
       const body = await resp.json();
       message = body.error ?? message;
+      detail = typeof body.detail === "string" ? body.detail : undefined;
     } catch {
       // ignore non-JSON error bodies
     }
-    throw new ApiError(resp.status, message);
+    throw new ApiError(resp.status, message, detail);
   }
 
   if (resp.status === 204) return undefined as T;
