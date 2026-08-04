@@ -8,17 +8,21 @@ generator client {
 }
 
 model User {
-  id                 Int                  @id @default(autoincrement())
-  username           String               @unique
-  passwordHash       String
-  role               String               @default("user") // "admin" | "user"
+  id           Int    @id @default(autoincrement())
+  // The login identifier. Required and unique - unlike the old optional
+  // email field, this one always has a value (backfilled from the old
+  // username on upgrade, see migration 20260804 for the cutover).
+  email        String @unique
+  // Display name shown throughout the UI (watch-buddy chips, "Angemeldet
+  // als ..."), separate from the login email.
+  name         String
+  passwordHash String
+  role         String @default("user") // "admin" | "user"
   // Set whenever an admin picks a user's initial/reset password on their
   // behalf - forces a self-service change on next login rather than letting
   // them keep using a password someone else chose.
   mustChangePassword Boolean              @default(false)
-  email              String?              @unique
-  // Opt-out for the "new episodes / show completed" digest email - only
-  // takes effect once an email address is actually set.
+  // Opt-out for the "new episodes / show completed" digest email.
   notifyEmail        Boolean              @default(true)
   createdAt          DateTime             @default(now())
   mediaItems         MediaItem[]

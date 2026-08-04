@@ -4,7 +4,7 @@ import { useAuth, ApiError } from "../api/AuthContext";
 
 export default function Login() {
   const { user, login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +16,7 @@ export default function Login() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(username, password);
+      await login(email, password);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Anmeldung fehlgeschlagen");
     } finally {
@@ -30,12 +30,12 @@ export default function Login() {
         <h1>🎬 MyWatchlist</h1>
         <form onSubmit={handleSubmit}>
           <label>
-            Benutzername
+            E-Mail-Adresse
             <input
-              type="text"
+              type="email"
               autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               autoFocus
             />

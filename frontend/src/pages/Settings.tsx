@@ -14,6 +14,7 @@ interface SyncLogEntry {
 interface SyncStatus {
   kodiConfigured: boolean;
   tmdbConfigured: boolean;
+  emailConfigured: boolean;
   lastSync: SyncLogEntry | null;
   lastMetadataRefresh: SyncLogEntry | null;
 }
@@ -26,16 +27,20 @@ export default function Settings() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
+  const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [notifyEmail, setNotifyEmail] = useState(user?.notifyEmail ?? true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
 
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmailMessage, setTestEmailMessage] = useState<string | null>(null);
+
   const [users, setUsers] = useState<User[]>([]);
-  const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [userError, setUserError] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
 
@@ -49,9 +54,10 @@ export default function Settings() {
   }, [user?.role]);
 
   useEffect(() => {
+    setName(user?.name ?? "");
     setEmail(user?.email ?? "");
     setNotifyEmail(user?.notifyEmail ?? true);
-  }, [user?.email, user?.notifyEmail]);
+  }, [user?.name, user?.email, user?.notifyEmail]);
 
   function loadStatus() {
     api.get<SyncStatus>("/sync/status").then(setStatus);
@@ -67,7 +73,7 @@ export default function Settings() {
     setProfileSaved(false);
     setSavingProfile(true);
     try {
-      const updated = await api.patch<User>("/auth/me", { email: email.trim() || null, notifyEmail });
+      const updated = await api.patch<User>("/auth/me", { name, email, notifyEmail });
       setUser(updated);
       setProfileSaved(true);
     } catch (err) {
@@ -77,19 +83,28 @@ export default function Settings() {
     }
   }
 
+  async function sendTestEmail(kind: "simple" | "digest") {
+    setTestingEmail(true);
+    setTestEmailMessage(null);
+    try {
+      const result = await api.post<{ sentTo: string }>("/sync/test-email", { kind });
+      setTestEmailMessage(`Gesendet an ${result.sentTo}.`);
+    } catch (err) {
+      setTestEmailMessage(err instanceof ApiError ? err.message : "Versand fehlgeschlagen");
+    } finally {
+      setTestingEmail(false);
+    }
+  }
+
   async function createUser(e: FormEvent) {
     e.preventDefault();
     setUserError(null);
     setCreatingUser(true);
     try {
-      await api.post("/users", {
-        username: newUsername,
-        password: newPassword,
-        email: newEmail.trim() || undefined,
-      });
-      setNewUsername("");
-      setNewPassword("");
+      await api.post("/users", { name: newName, email: newEmail, password: newPassword });
+      setNewName("");
       setNewEmail("");
+      setNewPassword("");
       loadUsers();
     } catch (err) {
       setUserError(err instanceof ApiError ? err.message : "Nutzer konnte nicht angelegt werden");
@@ -98,8 +113,8 @@ export default function Settings() {
     }
   }
 
-  async function deleteUser(id: number, username: string) {
-    if (!confirm(`Nutzer "${username}" wirklich löschen? Seine komplette Watchlist wird dabei unwiderruflich mitgelöscht.`))
+  async function deleteUser(id: number, name: string) {
+    if (!confirm(`Nutzer "${name}" wirklich löschen? Seine komplette Watchlist wird dabei unwiderruflich mitgelöscht.`))
       return;
     try {
       await api.delete(`/users/${id}`);
@@ -158,7 +173,7 @@ export default function Settings() {
 
       <section className="settings-section">
         <h2>Konto</h2>
-        <p>Angemeldet als {user?.username}</p>
+        <p>Angemeldet als {user?.name}</p>
         <button onClick={logout}>Abmelden</button>
       </section>
 
@@ -168,15 +183,19 @@ export default function Settings() {
       </section>
 
       <section className="settings-section">
-        <h2>E-Mail &amp; Benachrichtigungen</h2>
+        <h2>Profil &amp; Benachrichtigungen</h2>
         <p className="form-hint">
-          Wird für "Passwort vergessen" sowie Benachrichtigungen über neue Folgen und abgeschlossene Serien
-          verwendet. Ohne E-Mail-Adresse funktioniert beides nicht.
+          Die E-Mail-Adresse dient auch als Login. Sie wird außerdem für "Passwort vergessen" sowie
+          Benachrichtigungen über neue Folgen und abgeschlossene Serien verwendet.
         </p>
         <form className="user-form" onSubmit={saveProfile}>
           <label>
+            Name
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+          <label>
             E-Mail-Adresse
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="du@example.com" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label className="settings-checkbox-row">
             <input type="checkbox" checked={notifyEmail} onChange={(e) => setNotifyEmail(e.target.checked)} />
@@ -243,6 +262,31 @@ export default function Settings() {
 
       {user?.role === "admin" && (
         <section className="settings-section">
+          <h2>E-Mail-Versand</h2>
+          {status?.emailConfigured ? (
+            <>
+              <p className="form-hint">
+                Sendet an deine eigene hinterlegte Adresse ({user.email}). "Beispiel-Digest" zeigt genau das Format
+                der täglichen Benachrichtigungsmail mit Beispieldaten.
+              </p>
+              <div className="user-list__actions">
+                <button onClick={() => sendTestEmail("simple")} disabled={testingEmail}>
+                  {testingEmail ? "Sende…" : "Test-E-Mail senden"}
+                </button>
+                <button onClick={() => sendTestEmail("digest")} disabled={testingEmail}>
+                  {testingEmail ? "Sende…" : "Beispiel-Digest senden"}
+                </button>
+              </div>
+              {testEmailMessage && <p className="form-hint">{testEmailMessage}</p>}
+            </>
+          ) : (
+            <p>E-Mail ist nicht konfiguriert (siehe README / Umgebungsvariablen SMTP_*).</p>
+          )}
+        </section>
+      )}
+
+      {user?.role === "admin" && (
+        <section className="settings-section">
           <h2>Nutzer</h2>
           <p className="form-hint">
             Jeder Nutzer verwaltet seine eigene Watchlist unabhängig. Kodi-Sync betrifft nur dein eigenes Konto. Neu
@@ -254,8 +298,9 @@ export default function Settings() {
               <div key={u.id} className="user-list__row">
                 <div className="user-list__row-main">
                   <span>
-                    {u.username}
+                    {u.name}
                     {u.role === "admin" && <span className="user-list__badge">Admin</span>}
+                    <span className="user-list__email">{u.email}</span>
                   </span>
                   <div className="user-list__actions">
                     <button
@@ -269,10 +314,7 @@ export default function Settings() {
                       Passwort zurücksetzen
                     </button>
                     {u.id !== user.id && (
-                      <button
-                        className="danger-button danger-button--small"
-                        onClick={() => deleteUser(u.id, u.username)}
-                      >
+                      <button className="danger-button danger-button--small" onClick={() => deleteUser(u.id, u.name)}>
                         Entfernen
                       </button>
                     )}
@@ -299,14 +341,12 @@ export default function Settings() {
 
           <form className="user-form" onSubmit={createUser}>
             <label>
-              Nutzername
-              <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                minLength={3}
-                required
-              />
+              Name
+              <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} required />
+            </label>
+            <label>
+              E-Mail-Adresse
+              <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
             </label>
             <label>
               Passwort
@@ -317,10 +357,6 @@ export default function Settings() {
                 minLength={8}
                 required
               />
-            </label>
-            <label>
-              E-Mail (optional)
-              <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
             </label>
             {userError && <div className="form-error">{userError}</div>}
             <button type="submit" disabled={creatingUser}>

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 
 export default function ForgotPassword() {
-  const [usernameOrEmail, setUsernameOrEmail] = useState("");
+  const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -13,9 +13,7 @@ export default function ForgotPassword() {
     setError(null);
     setSubmitting(true);
     try {
-      const result = await api.post<{ ok: boolean; message: string }>("/auth/forgot-password", {
-        usernameOrEmail,
-      });
+      const result = await api.post<{ ok: boolean; message: string }>("/auth/forgot-password", { email });
       setMessage(result.message);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Anfrage fehlgeschlagen");
@@ -34,14 +32,8 @@ export default function ForgotPassword() {
         ) : (
           <form onSubmit={handleSubmit}>
             <label>
-              Benutzername oder E-Mail
-              <input
-                type="text"
-                value={usernameOrEmail}
-                onChange={(e) => setUsernameOrEmail(e.target.value)}
-                required
-                autoFocus
-              />
+              E-Mail-Adresse
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
             </label>
             {error && <div className="form-error">{error}</div>}
             <button type="submit" disabled={submitting}>

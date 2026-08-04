@@ -33,7 +33,7 @@ without cloning the repo or building anything locally:
 
 - **TrueNAS SCALE**: Apps → Discover Apps → **Custom App** → **Install via
   YAML**, paste the contents of `deploy/truenas-install.yaml` (filled in
-  with your own `SESSION_SECRET`/`APP_PASSWORD`/`TMDB_API_KEY`).
+  with your own `SESSION_SECRET`/`APP_EMAIL`/`APP_PASSWORD`/`TMDB_API_KEY`).
 - **Any other Docker host**:
   ```bash
   curl -O https://raw.githubusercontent.com/Zendonir/MyWatchlist/main/deploy/truenas-install.yaml
@@ -55,15 +55,16 @@ To build the image yourself instead of using the published one, follow the
    ```bash
    cp .env.example .env
    ```
-   At minimum set `SESSION_SECRET`, `APP_USERNAME`, `APP_PASSWORD`, and a
-   `TMDB_API_KEY` (see below). Kodi and TVDB settings are optional.
+   At minimum set `SESSION_SECRET`, `APP_EMAIL`, `APP_PASSWORD`, and a
+   `TMDB_API_KEY` (see below). Kodi, TVDB and email (`SMTP_*`) settings are
+   optional.
 3. Build and start:
    ```bash
    docker compose up -d --build
    ```
    By default the app is **not** published to the host at all - see
    "Externer Zugriff & Sicherheit" below for how to actually reach it.
-4. Log in with the `APP_USERNAME`/`APP_PASSWORD` you set. That account is
+4. Log in with the `APP_EMAIL`/`APP_PASSWORD` you set. That account is
    created automatically on first boot (only if no users exist yet).
 
 On TrueNAS Scale, this repo's `docker-compose.yml` can be used directly with
@@ -188,12 +189,14 @@ once that the certificate isn't trusted (expected, self-signed) - accept it
 
 ## Multi-user
 
-The account from `APP_USERNAME`/`APP_PASSWORD` is an admin. From **Settings
-→ Nutzer**, an admin can add accounts for friends/family - each person gets
-their own completely independent watchlist (own statuses, own watched
-progress). Kodi sync only ever touches the admin account's list, since Kodi
-is a shared household library, not something each friend has their own copy
-of; everyone else adds things by hand via search.
+The account from `APP_EMAIL`/`APP_PASSWORD` is an admin. Login is by email
+address, with a separate display name shown throughout the UI. From
+**Settings → Nutzer**, an admin can add accounts for friends/family (name +
+email + password each) - each person gets their own completely independent
+watchlist (own statuses, own watched progress). Kodi sync only ever touches
+the admin account's list, since Kodi is a shared household library, not
+something each friend has their own copy of; everyone else adds things by
+hand via search.
 
 **Watching together**: on any item's detail page, "Zusammen schauen mit"
 lets you add other users you're watching it with. Adding someone puts that
@@ -209,9 +212,9 @@ else - the admin-picked one is one-time only.
 
 ## Email (optional)
 
-Set the `SMTP_*` and `APP_URL` variables (see `.env.example`) to enable two
-things - both are entirely optional, and each user opts into email
-individually by adding an address under **Settings**:
+Every account has an email address (it's the login), but actually *sending*
+mail is opt-in - set the `SMTP_*` and `APP_URL` variables (see
+`.env.example`) to enable two things:
 
 - **Passwort vergessen**: a "Passwort vergessen?" link on the login page
   sends a one-hour, single-use reset link. Without `APP_URL` set, this stays
@@ -219,9 +222,13 @@ individually by adding an address under **Settings**:
   users can still be helped out via **Settings → Nutzer → Passwort
   zurücksetzen** (admin-only, no email required).
 - **Digest emails**: once a day, alongside the metadata refresh, anyone with
-  an email address set and "Per E-Mail benachrichtigen" enabled gets a
-  summary of new episodes discovered and shows that just finished - only for
-  content on their own list. Turn it off per-account in Settings.
+  "Per E-Mail benachrichtigen" enabled (on by default, toggle it under
+  Settings) gets a summary of new episodes discovered and shows that just
+  finished - only for content on their own list.
+
+Once `SMTP_*` is set, an admin can verify it works and preview the digest
+format from **Settings → E-Mail-Versand** ("Test-E-Mail senden" /
+"Beispiel-Digest senden").
 
 ## Installing on iPhone
 

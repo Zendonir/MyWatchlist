@@ -3,16 +3,17 @@ import { prisma } from "../db";
 import { env } from "../env";
 
 /**
- * Creates the initial admin user from APP_USERNAME/APP_PASSWORD if no users
- * exist yet. Safe to run on every startup - it's a no-op once a user exists.
+ * Creates the initial admin user from APP_EMAIL/APP_PASSWORD (and optional
+ * APP_NAME) if no users exist yet. Safe to run on every startup - it's a
+ * no-op once a user exists.
  */
 export async function bootstrapAdminUser() {
   const existing = await prisma.user.count();
   if (existing > 0) return;
 
-  if (!env.APP_USERNAME || !env.APP_PASSWORD) {
+  if (!env.APP_EMAIL || !env.APP_PASSWORD) {
     console.warn(
-      "No users exist and APP_USERNAME/APP_PASSWORD are not set - " +
+      "No users exist and APP_EMAIL/APP_PASSWORD are not set - " +
         "set them in your environment to create the initial admin account."
     );
     return;
@@ -21,10 +22,11 @@ export async function bootstrapAdminUser() {
   const passwordHash = await bcrypt.hash(env.APP_PASSWORD, 12);
   await prisma.user.create({
     data: {
-      username: env.APP_USERNAME,
+      email: env.APP_EMAIL,
+      name: env.APP_NAME,
       passwordHash,
       role: "admin",
     },
   });
-  console.log(`Created initial admin user "${env.APP_USERNAME}"`);
+  console.log(`Created initial admin user "${env.APP_EMAIL}"`);
 }

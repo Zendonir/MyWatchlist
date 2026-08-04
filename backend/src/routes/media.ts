@@ -197,7 +197,7 @@ mediaRouter.get("/:id/buddies", async (req, res) => {
 
   const group = await prisma.watchGroup.findUnique({
     where: { mediaType_tmdbId: { mediaType: item.mediaType, tmdbId: item.tmdbId } },
-    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+    include: { members: { include: { user: { select: { id: true, name: true } } } } },
   });
   res.json(group?.members.map((m) => m.user) ?? []);
 });
@@ -251,7 +251,7 @@ mediaRouter.post("/:id/buddies", async (req, res) => {
 
   const updated = await prisma.watchGroup.findUnique({
     where: { id: group.id },
-    include: { members: { include: { user: { select: { id: true, username: true } } } } },
+    include: { members: { include: { user: { select: { id: true, name: true } } } } },
   });
   res.json(updated?.members.map((m) => m.user) ?? []);
 });

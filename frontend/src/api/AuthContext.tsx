@@ -4,7 +4,7 @@ import { api, ApiError, User } from "./client";
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User) => void;
 }
@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(username: string, password: string) {
-    const loggedIn = await api.post<User>("/auth/login", { username, password });
+  async function login(email: string, password: string) {
+    const loggedIn = await api.post<User>("/auth/login", { email, password });
     setUser(loggedIn);
   }
 

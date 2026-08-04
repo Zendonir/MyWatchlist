@@ -43,10 +43,10 @@ export const api = {
 
 export interface User {
   id: number;
-  username: string;
+  email: string;
+  name: string;
   role: string;
   mustChangePassword: boolean;
-  email: string | null;
   notifyEmail: boolean;
 }
 

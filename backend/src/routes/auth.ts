@@ -12,18 +12,18 @@ export const authRouter = Router();
 
 function toSafeUser(user: {
   id: number;
-  username: string;
+  email: string;
+  name: string;
   role: string;
   mustChangePassword: boolean;
-  email: string | null;
   notifyEmail: boolean;
 }) {
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
+    name: user.name,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
-    email: user.email,
     notifyEmail: user.notifyEmail,
   };
 }
@@ -37,7 +37,11 @@ const loginLimiter = rateLimit({
 });
 
 const loginSchema = z.object({
-  username: z.string().min(1).max(100),
+  // Deliberately not validated as a strict email format: accounts upgraded
+  // from the old username-based login had their username copied into this
+  // field verbatim (see migration 20260804065526) and must still be able to
+  // log in with it until they set a real address.
+  email: z.string().min(1).max(200),
   password: z.string().min(1).max(200),
 });
 
@@ -46,25 +50,24 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid request" });
   }
-  const { username, password } = parsed.data;
+  const { email, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    // Constant-ish time: still hash something so username enumeration via
+    // Constant-ish time: still hash something so email enumeration via
     // timing is not trivial.
     await bcrypt.compare(password, "$2a$12$invalidsaltinvalidsaltinvalidsaltinvalidsalt");
-    return res.status(401).json({ error: "Invalid username or password" });
+    return res.status(401).json({ error: "Invalid email or password" });
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    return res.status(401).json({ error: "Invalid username or password" });
+    return res.status(401).json({ error: "Invalid email or password" });
   }
 
   req.session.regenerate((err) => {
     if (err) return res.status(500).json({ error: "Login failed" });
     req.session.userId = user.id;
-    req.session.username = user.username;
     req.session.role = user.role;
     req.session.save((saveErr) => {
       if (saveErr) return res.status(500).json({ error: "Login failed" });
@@ -87,7 +90,8 @@ authRouter.get("/me", requireAuth, async (req, res) => {
 });
 
 const updateMeSchema = z.object({
-  email: z.string().email().max(200).nullable().optional(),
+  email: z.string().email().max(200).optional(),
+  name: z.string().min(1).max(100).optional(),
   notifyEmail: z.boolean().optional(),
 });
 
@@ -96,7 +100,7 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
-  const { email, notifyEmail } = parsed.data;
+  const { email, name, notifyEmail } = parsed.data;
 
   if (email) {
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -108,7 +112,8 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.update({
     where: { id: req.session.userId! },
     data: {
-      ...(email !== undefined ? { email: email || null } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(name !== undefined ? { name } : {}),
       ...(notifyEmail !== undefined ? { notifyEmail } : {}),
     },
   });
@@ -150,7 +155,7 @@ const forgotPasswordLimiter = rateLimit({
 });
 
 const forgotPasswordSchema = z.object({
-  usernameOrEmail: z.string().min(1).max(200),
+  email: z.string().min(1).max(200),
 });
 
 authRouter.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
@@ -159,22 +164,19 @@ authRouter.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     return res.status(400).json({ error: "Invalid request" });
   }
 
-  // Always respond the same way regardless of whether the account exists,
-  // has an email set, or email is even configured - a differing response
-  // would let an attacker enumerate valid usernames/emails.
+  // Always respond the same way regardless of whether the account exists or
+  // email is even configured - a differing response would let an attacker
+  // enumerate valid accounts.
   const genericResponse = {
     ok: true,
-    message: "Falls ein Konto mit diesen Angaben existiert, wurde eine E-Mail mit weiteren Schritten verschickt.",
+    message: "Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde eine E-Mail mit weiteren Schritten verschickt.",
   };
 
   if (!passwordResetConfigured) return res.json(genericResponse);
 
-  const { usernameOrEmail } = parsed.data;
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ username: usernameOrEmail }, { email: usernameOrEmail }] },
-  });
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
 
-  if (user?.email) {
+  if (user) {
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     await prisma.passwordResetToken.create({
@@ -185,8 +187,8 @@ authRouter.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
     await sendMail({
       to: user.email,
       subject: "MyWatchlist - Passwort zurücksetzen",
-      text: `Hallo ${user.username},\n\nüber diesen Link kannst du dein Passwort zurücksetzen (gültig für 1 Stunde):\n${resetUrl}\n\nWenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.`,
-      html: `<p>Hallo ${user.username},</p><p>über diesen Link kannst du dein Passwort zurücksetzen (gültig für 1 Stunde):</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>`,
+      text: `Hallo ${user.name},\n\nüber diesen Link kannst du dein Passwort zurücksetzen (gültig für 1 Stunde):\n${resetUrl}\n\nWenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.`,
+      html: `<p>Hallo ${user.name},</p><p>über diesen Link kannst du dein Passwort zurücksetzen (gültig für 1 Stunde):</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>`,
     }).catch((err) => console.error("Failed to send password reset email:", err));
   }
 

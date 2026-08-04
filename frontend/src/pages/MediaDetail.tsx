@@ -230,8 +230,8 @@ function WatchBuddies({ mediaItemId }: { mediaItemId: number }) {
         <div className="watch-buddies__chips">
           {others.map((b) => (
             <span key={b.id} className="watch-buddies__chip">
-              {b.username}
-              <button aria-label={`${b.username} entfernen`} onClick={() => removeBuddy(b.id)}>
+              {b.name}
+              <button aria-label={`${b.name} entfernen`} onClick={() => removeBuddy(b.id)}>
                 ×
               </button>
             </span>
@@ -245,7 +245,7 @@ function WatchBuddies({ mediaItemId }: { mediaItemId: number }) {
             <option value="">Person auswählen…</option>
             {addableUsers.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.username}
+                {u.name}
               </option>
             ))}
           </select>

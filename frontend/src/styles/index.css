@@ -496,6 +496,12 @@ button[type="submit"],
   border-radius: 6px;
 }
 
+.user-list__email {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .user-form {
   gap: 10px;
 }

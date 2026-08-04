@@ -7,21 +7,21 @@ import { requireAdmin } from "../middleware/auth";
 export const usersRouter = Router();
 
 // Open to any authenticated user, not just admins: picking watch buddies
-// needs to see who else has an account. Username/role/createdAt aren't
+// needs to see who else has an account. Name/email/role/createdAt aren't
 // sensitive within a private, invite-only household app.
 usersRouter.get("/", async (_req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, username: true, role: true, createdAt: true },
+    select: { id: true, name: true, email: true, role: true, createdAt: true },
     orderBy: { id: "asc" },
   });
   res.json(users);
 });
 
 const createUserSchema = z.object({
-  username: z.string().min(3).max(50),
+  email: z.string().email().max(200),
+  name: z.string().min(1).max(100),
   password: z.string().min(8).max(200),
   role: z.enum(["admin", "user"]).default("user"),
-  email: z.string().email().max(200).optional(),
 });
 
 usersRouter.post("/", requireAdmin, async (req, res) => {
@@ -29,22 +29,18 @@ usersRouter.post("/", requireAdmin, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
-  const { username, password, role, email } = parsed.data;
+  const { email, name, password, role } = parsed.data;
 
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) return res.status(409).json({ error: "Username already exists" });
-  if (email) {
-    const existingEmail = await prisma.user.findUnique({ where: { email } });
-    if (existingEmail) return res.status(409).json({ error: "Diese E-Mail-Adresse wird bereits verwendet" });
-  }
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return res.status(409).json({ error: "Diese E-Mail-Adresse wird bereits verwendet" });
 
   const passwordHash = await bcrypt.hash(password, 12);
   // Admin picked this password on the user's behalf, so force a self-service
   // change on first login rather than letting them keep it indefinitely.
   const user = await prisma.user.create({
-    data: { username, passwordHash, role, email, mustChangePassword: true },
+    data: { email, name, passwordHash, role, mustChangePassword: true },
   });
-  res.status(201).json({ id: user.id, username: user.username, role: user.role });
+  res.status(201).json({ id: user.id, email: user.email, name: user.name, role: user.role });
 });
 
 const resetPasswordSchema = z.object({

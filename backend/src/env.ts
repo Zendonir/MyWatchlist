@@ -7,7 +7,8 @@ const schema = z.object({
   SESSION_SECRET: z.string().min(16, "SESSION_SECRET must be at least 16 characters"),
   TRUST_PROXY: z.coerce.number().default(1),
 
-  APP_USERNAME: z.string().min(1).optional(),
+  APP_EMAIL: z.string().email().optional(),
+  APP_NAME: z.string().min(1).max(100).default("Admin"),
   APP_PASSWORD: z.string().min(8).optional(),
 
   TMDB_API_KEY: z.string().optional(),
