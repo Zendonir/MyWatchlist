@@ -124,13 +124,20 @@ Database" / "TheTVDB" scrapers do this from Kodi 19+). Items Kodi has no
 TMDB id for (e.g. only scraped from IMDB in older libraries) can't be
 auto-matched; add and mark those watched manually in the app.
 
-**Watched items are imported automatically** - anything in your Kodi
-library with a play count greater than zero is added to your watchlist
-(fetching metadata from TMDB) and marked watched if it isn't already
-there, not just matched against items you added by hand. A first sync
-against a large library can take a while and make a lot of TMDB requests
-(one per movie/show, plus one per season for shows); subsequent syncs are
-fast since only newly-watched items trigger new TMDB lookups.
+**Your whole Kodi library is mirrored, not just watched items** - every
+movie and show Kodi knows about (with a matchable TMDB id) gets imported
+and kept in sync, fetching metadata from TMDB. A first sync against a
+large library can take a while and make a lot of TMDB requests (one per
+movie/show, plus one per season for shows); subsequent syncs are fast
+since only actual changes trigger new TMDB lookups.
+
+The sync is fully bidirectional: unmarking something as watched in Kodi
+(or deleting the episode/movie file so it drops out of Kodi's library)
+removes the watched mark here too, not just adds it. If a movie or show is
+removed from Kodi's library entirely, it's removed from your watchlist as
+well - as long as the sync actually reached Kodi and got real data back;
+a run that returns nothing at all (e.g. a connection hiccup) never
+deletes anything, to avoid wiping your list on a transient failure.
 
 Season/episode numbers are read via Kodi's `episode_view` using column names
 that are correct for most modern Kodi schema versions, but can shift on very

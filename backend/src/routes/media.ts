@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db";
 import { importMovie, importTvShow } from "../services/mediaImport";
-import { maybeMarkShowWatched } from "../lib/showStatus";
+import { syncShowWatchedStatus } from "../lib/showStatus";
 import { getShowSchedule } from "../lib/showSchedule";
 
 export const mediaRouter = Router();
@@ -151,7 +151,7 @@ mediaRouter.patch("/:id/episodes/:episodeId", async (req, res) => {
     data: { watched: parsed.data.watched, watchedAt: parsed.data.watched ? new Date() : null },
   });
 
-  await maybeMarkShowWatched(mediaItemId);
+  await syncShowWatchedStatus(mediaItemId);
 
   res.json(updated);
 });
@@ -177,7 +177,7 @@ mediaRouter.patch("/:id/seasons/:seasonNumber", async (req, res) => {
   });
   if (count === 0) return res.status(404).json({ error: "Season not found" });
 
-  await maybeMarkShowWatched(mediaItemId);
+  await syncShowWatchedStatus(mediaItemId);
 
   const episodes = await prisma.episode.findMany({
     where: { mediaItemId, seasonNumber },
