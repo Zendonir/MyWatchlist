@@ -16,6 +16,7 @@ export default function MediaDetail() {
   const [item, setItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [posterFailed, setPosterFailed] = useState(false);
+  const [expandedSeasons, setExpandedSeasons] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     load();
@@ -52,6 +53,15 @@ export default function MediaDetail() {
     if (!item) return;
     await api.patch(`/media/${item.id}/seasons/${seasonNumber}`, { watched });
     refresh();
+  }
+
+  function toggleSeasonExpanded(seasonNumber: number) {
+    setExpandedSeasons((prev) => {
+      const next = new Set(prev);
+      if (next.has(seasonNumber)) next.delete(seasonNumber);
+      else next.add(seasonNumber);
+      return next;
+    });
   }
 
   async function remove() {
@@ -135,10 +145,23 @@ export default function MediaDetail() {
           {Object.entries(bySeason).map(([season, episodes]) => {
             const seasonNumber = Number(season);
             const allWatched = episodes.every((e) => e.watched);
+            const watchedCount = episodes.filter((e) => e.watched).length;
+            const expanded = expandedSeasons.has(seasonNumber);
             return (
               <div key={season}>
                 <div className="episode-list__season-header">
-                  <h2 className="episode-list__season">Staffel {season}</h2>
+                  <button
+                    type="button"
+                    className="episode-list__season-toggle"
+                    onClick={() => toggleSeasonExpanded(seasonNumber)}
+                    aria-expanded={expanded}
+                  >
+                    <span className="episode-list__season-arrow">{expanded ? "▾" : "▸"}</span>
+                    <h2 className="episode-list__season">Staffel {season}</h2>
+                    <span className="episode-list__season-count">
+                      {watchedCount}/{episodes.length} Folgen
+                    </span>
+                  </button>
                   <label className="season-mark-all">
                     <input
                       type="checkbox"
@@ -148,9 +171,8 @@ export default function MediaDetail() {
                     Staffel als gesehen markieren
                   </label>
                 </div>
-                {episodes.map((ep) => (
-                  <EpisodeRow key={ep.id} episode={ep} onToggle={toggleEpisode} />
-                ))}
+                {expanded &&
+                  episodes.map((ep) => <EpisodeRow key={ep.id} episode={ep} onToggle={toggleEpisode} />)}
               </div>
             );
           })}

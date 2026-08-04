@@ -619,6 +619,30 @@ button[type="submit"],
   color: var(--text-muted);
 }
 
+.episode-list__season-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.episode-list__season-arrow {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  width: 10px;
+}
+
+.episode-list__season-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .season-mark-all {
   display: flex;
   align-items: center;
