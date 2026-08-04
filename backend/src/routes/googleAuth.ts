@@ -23,24 +23,36 @@ googleAuthRouter.get("/connect", requireAdmin, (req, res) => {
 // X-Requested-With header requireApiHeader normally checks (GETs are exempt
 // from that check anyway). The `state` param is what stops a third party
 // from tricking an admin into linking an attacker-controlled Google account.
+//
+// This lands in a popup window (see Settings.tsx), so instead of redirecting
+// straight to /settings it redirects to the SPA's /oauth-callback route,
+// which relays the result back to the opener via postMessage and closes
+// itself - falling back to a normal /settings redirect if there's no
+// opener (e.g. popups were blocked and /connect was opened top-level).
 googleAuthRouter.get("/callback", requireAdmin, async (req, res) => {
   const { code, state, error } = req.query;
   const expectedState = req.session.googleOAuthState;
   delete req.session.googleOAuthState;
 
+  function redirectResult(ok: boolean, message?: string) {
+    const params = new URLSearchParams({ ok: ok ? "1" : "0" });
+    if (message) params.set("message", message);
+    res.redirect(`/oauth-callback?${params.toString()}`);
+  }
+
   if (error) {
-    return res.redirect(`/settings?google=error&message=${encodeURIComponent(String(error))}`);
+    return redirectResult(false, String(error));
   }
   if (!code || typeof code !== "string" || !state || state !== expectedState) {
-    return res.redirect(`/settings?google=error&message=${encodeURIComponent("Ungültige oder abgelaufene Anfrage")}`);
+    return redirectResult(false, "Ungültige oder abgelaufene Anfrage");
   }
 
   try {
     await handleCallback(code, req.session.userId!);
-    res.redirect("/settings?google=connected");
+    redirectResult(true);
   } catch (err: any) {
     console.error("Google OAuth callback failed:", err);
-    res.redirect(`/settings?google=error&message=${encodeURIComponent(String(err?.message ?? err))}`);
+    redirectResult(false, String(err?.message ?? err));
   }
 });
 

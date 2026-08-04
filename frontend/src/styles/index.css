@@ -432,18 +432,6 @@ button[type="submit"],
   font-size: 0.8rem;
 }
 
-.button-link {
-  display: inline-block;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  text-align: center;
-}
-
 .form-error {
   color: var(--danger);
   font-size: 0.85rem;

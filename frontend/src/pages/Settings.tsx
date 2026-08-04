@@ -74,6 +74,32 @@ export default function Settings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The popup's /oauth-callback page posts the result here instead of the
+  // popup itself navigating this window - see connectGoogle below.
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.source !== "mywatchlist-google-oauth") return;
+      if (event.data.ok) {
+        setGoogleStatusMessage("Google-Konto erfolgreich verbunden.");
+        loadStatus();
+      } else {
+        setGoogleStatusMessage(`Verbindung fehlgeschlagen: ${event.data.message ?? "unbekannter Fehler"}`);
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  function connectGoogle() {
+    const popup = window.open("/api/admin/google/connect", "google-connect", "width=500,height=650");
+    // Popup blockers etc. can return null - fall back to a normal top-level
+    // navigation, which /oauth-callback also handles fine (no window.opener).
+    if (!popup) {
+      window.location.href = "/api/admin/google/connect";
+    }
+  }
+
   useEffect(() => {
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
@@ -333,9 +359,7 @@ export default function Settings() {
                 Verbinde ein Google-Konto, um "Passwort vergessen" und tägliche Benachrichtigungsmails (neue Folgen /
                 abgeschlossene Serien) zu aktivieren.
               </p>
-              <a className="button-link" href="/api/admin/google/connect">
-                Mit Google verbinden
-              </a>
+              <button onClick={connectGoogle}>Mit Google verbinden</button>
             </>
           )}
           {googleStatusMessage && <p className="form-hint">{googleStatusMessage}</p>}
